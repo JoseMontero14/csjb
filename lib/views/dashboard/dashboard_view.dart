@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../../controllers/dashboard_controller.dart';
+import '../../models/toma_model.dart';
 import '../../utils/routes.dart';
 import '../../utils/theme.dart';
 import '../../widgets/app_card.dart';
+
+// UID placeholder hasta integrar AuthController global
+const _kUidPlaceholder = 'uid-placeholder';
 
 class DashboardView extends StatefulWidget {
   const DashboardView({super.key});
@@ -11,23 +16,43 @@ class DashboardView extends StatefulWidget {
   State<DashboardView> createState() => _DashboardViewState();
 }
 
-class _DashboardViewState extends State<DashboardView> {
+class _DashboardViewState extends State<DashboardView> with RouteAware {
+  final _controller = DashboardController();
   int _tabIndex = 0;
 
-  // Destinos del bottom nav que ya tienen ruta
+  @override
+  void initState() {
+    super.initState();
+    _cargar();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _cargar() => _controller.cargar(_kUidPlaceholder);
+
+  /// Navega a una ruta y recarga el dashboard al volver.
+  Future<void> _pushAndRefresh(String route) async {
+    await AppRoutes.push(context, route);
+    if (mounted) _cargar();
+  }
+
   void _onTabTap(int index) {
     if (index == _tabIndex) return;
     switch (index) {
       case 0:
         setState(() => _tabIndex = 0);
       case 1:
-        AppRoutes.push(context, AppRoutes.chatLista);
+        _pushAndRefresh(AppRoutes.chatLista);
       case 2:
-        AppRoutes.push(context, AppRoutes.triajeSintomas);
+        _pushAndRefresh(AppRoutes.triajeSintomas);
       case 3:
-        AppRoutes.push(context, AppRoutes.examenes);
+        _pushAndRefresh(AppRoutes.examenes);
       case 4:
-        AppRoutes.push(context, AppRoutes.medicos);
+        _pushAndRefresh(AppRoutes.medicos);
     }
   }
 
@@ -36,8 +61,15 @@ class _DashboardViewState extends State<DashboardView> {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: _buildAppBar(context),
-      body: _DashboardBody(),
-      floatingActionButton: _BotonEmergencia(),
+      body: ListenableBuilder(
+        listenable: _controller,
+        builder: (context, _) => _DashboardBody(
+          controller: _controller,
+          onMedicacionTap: () => _pushAndRefresh(AppRoutes.medicacion),
+          onTriajeTap: () => _pushAndRefresh(AppRoutes.triajeSintomas),
+        ),
+      ),
+      floatingActionButton: const _BotonEmergencia(),
       bottomNavigationBar: _BottomNav(
         currentIndex: _tabIndex,
         onTap: _onTabTap,
@@ -48,7 +80,8 @@ class _DashboardViewState extends State<DashboardView> {
   AppBar _buildAppBar(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final now = DateTime.now();
-    final fecha = DateFormat("EEEE d 'de' MMMM", 'es').format(now).toUpperCase();
+    final fecha =
+        DateFormat("EEEE d 'de' MMMM", 'es').format(now).toUpperCase();
 
     return AppBar(
       automaticallyImplyLeading: false,
@@ -62,10 +95,7 @@ class _DashboardViewState extends State<DashboardView> {
               letterSpacing: 0.8,
             ),
           ),
-          Text(
-            'Hola, José',
-            style: textTheme.titleLarge,
-          ),
+          const Text('Hola, José'),
         ],
       ),
       actions: [
@@ -83,20 +113,34 @@ class _DashboardViewState extends State<DashboardView> {
 // ── Body ─────────────────────────────────────────────────────────────────────
 
 class _DashboardBody extends StatelessWidget {
+  const _DashboardBody({
+    required this.controller,
+    required this.onMedicacionTap,
+    required this.onTriajeTap,
+  });
+
+  final DashboardController controller;
+  final VoidCallback onMedicacionTap;
+  final VoidCallback onTriajeTap;
+
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.all(AppSpacing.md),
-      children: const [
-        _CardBienestar(),
-        SizedBox(height: AppSpacing.md),
-        _CardRecordatorio(),
-        SizedBox(height: AppSpacing.md),
-        _CardTriaje(),
-        SizedBox(height: AppSpacing.md),
-        _CardTip(),
-        SizedBox(height: AppSpacing.xxl), // espacio para el FAB
-      ],
+    return RefreshIndicator(
+      color: AppColors.primary,
+      onRefresh: () => controller.cargar(_kUidPlaceholder),
+      child: ListView(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        children: [
+          _CardBienestar(controller: controller, onTap: onMedicacionTap),
+          const SizedBox(height: AppSpacing.md),
+          _CardRecordatorio(controller: controller, onTap: onMedicacionTap),
+          const SizedBox(height: AppSpacing.md),
+          _CardTriaje(onTap: onTriajeTap),
+          const SizedBox(height: AppSpacing.md),
+          const _CardTip(),
+          const SizedBox(height: AppSpacing.xxl),
+        ],
+      ),
     );
   }
 }
@@ -104,38 +148,50 @@ class _DashboardBody extends StatelessWidget {
 // ── Card 1: Bienestar ─────────────────────────────────────────────────────────
 
 class _CardBienestar extends StatelessWidget {
-  const _CardBienestar();
+  const _CardBienestar({required this.controller, required this.onTap});
+
+  final DashboardController controller;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final data = controller.data;
+    final isLoading = controller.isLoading;
+
+    final pct = data.bienestarPct;
+    final value = data.totalHoy == 0 ? 0.0 : pct / 100.0;
 
     return AppCard(
+      onTap: onTap,
       child: Row(
         children: [
-          // Indicador circular
           SizedBox(
             width: 72,
             height: 72,
             child: Stack(
               fit: StackFit.expand,
               children: [
-                CircularProgressIndicator(
-                  value: 0,
-                  strokeWidth: 7,
-                  backgroundColor: AppColors.surfaceVariant,
-                  color: AppColors.primary,
-                  strokeCap: StrokeCap.round,
-                ),
-                Center(
-                  child: Text(
-                    '0%',
-                    style: textTheme.titleMedium?.copyWith(
-                      color: AppColors.primary,
-                      fontWeight: FontWeight.w700,
+                if (isLoading)
+                  const CircularProgressIndicator(strokeWidth: 7)
+                else
+                  CircularProgressIndicator(
+                    value: value,
+                    strokeWidth: 7,
+                    backgroundColor: AppColors.surfaceVariant,
+                    color: AppColors.primary,
+                    strokeCap: StrokeCap.round,
+                  ),
+                if (!isLoading)
+                  Center(
+                    child: Text(
+                      '$pct%',
+                      style: textTheme.titleMedium?.copyWith(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
-                ),
               ],
             ),
           ),
@@ -146,55 +202,65 @@ class _CardBienestar extends StatelessWidget {
               children: [
                 Text('Bienestar general', style: textTheme.titleSmall),
                 const SizedBox(height: 4),
-                Text(
-                  'Sin registros aún',
-                  style: textTheme.bodySmall,
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'Registra tus medicamentos para ver tu adherencia',
-                  style: textTheme.bodySmall?.copyWith(
-                    color: AppColors.textDisabled,
-                    fontSize: 11,
+                if (isLoading)
+                  Text('Cargando...', style: textTheme.bodySmall)
+                else if (data.sinRegistros)
+                  Text('Sin registros aún', style: textTheme.bodySmall)
+                else
+                  Text(
+                    '${data.tomadasHoy} de ${data.totalHoy} tomas hoy',
+                    style: textTheme.bodySmall,
                   ),
-                ),
+                if (!isLoading && data.sinRegistros) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    'Registra tus medicamentos para ver tu adherencia',
+                    style: textTheme.bodySmall
+                        ?.copyWith(color: AppColors.textDisabled, fontSize: 11),
+                  ),
+                ],
               ],
             ),
           ),
-          const Icon(
-            Icons.chevron_right_rounded,
-            color: AppColors.textDisabled,
-          ),
+          const Icon(Icons.chevron_right_rounded, color: AppColors.textDisabled),
         ],
       ),
-      onTap: () {},
     );
   }
 }
 
-// ── Card 2: Recordatorio ──────────────────────────────────────────────────────
+// ── Card 2: Próximo recordatorio ──────────────────────────────────────────────
 
 class _CardRecordatorio extends StatelessWidget {
-  const _CardRecordatorio();
+  const _CardRecordatorio({required this.controller, required this.onTap});
+
+  final DashboardController controller;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final proxima = controller.data.proximaToma;
+    final isLoading = controller.isLoading;
 
     return AppCard(
-      onTap: () {},
+      onTap: onTap,
       child: Row(
         children: [
           Container(
             width: 48,
             height: 48,
             decoration: BoxDecoration(
-              color: AppColors.surfaceVariant,
+              color: proxima != null
+                  ? AppColors.surfaceVariant
+                  : AppColors.urgencyLowBg,
               borderRadius: AppRadius.mdBr,
             ),
-            child: const Icon(
+            child: Icon(
               Icons.medication_outlined,
-              color: AppColors.primary,
+              color: proxima != null
+                  ? AppColors.primary
+                  : AppColors.urgencyLow,
               size: 26,
             ),
           ),
@@ -205,16 +271,65 @@ class _CardRecordatorio extends StatelessWidget {
               children: [
                 Text('Próximo recordatorio', style: textTheme.titleSmall),
                 const SizedBox(height: 4),
-                Text('Sin recordatorios', style: textTheme.bodySmall),
+                if (isLoading)
+                  Text('Cargando...', style: textTheme.bodySmall)
+                else if (proxima == null)
+                  Text(
+                    controller.data.sinRegistros
+                        ? 'Sin recordatorios'
+                        : '¡Todas las tomas completadas hoy!',
+                    style: textTheme.bodySmall,
+                  )
+                else
+                  _ProximaTomaTile(proxima: proxima),
               ],
             ),
           ),
-          const Icon(
-            Icons.chevron_right_rounded,
-            color: AppColors.textDisabled,
-          ),
+          const Icon(Icons.chevron_right_rounded, color: AppColors.textDisabled),
         ],
       ),
+    );
+  }
+}
+
+class _ProximaTomaTile extends StatelessWidget {
+  const _ProximaTomaTile({required this.proxima});
+  final TomaConRecordatorio proxima;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          proxima.medicamento,
+          style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        Row(
+          children: [
+            Text(proxima.dosis, style: textTheme.bodySmall),
+            const SizedBox(width: AppSpacing.sm),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withAlpha(20),
+                borderRadius: AppRadius.fullBr,
+              ),
+              child: Text(
+                proxima.toma.hora,
+                style: textTheme.labelSmall?.copyWith(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }
@@ -222,14 +337,15 @@ class _CardRecordatorio extends StatelessWidget {
 // ── Card 3: Triaje ────────────────────────────────────────────────────────────
 
 class _CardTriaje extends StatelessWidget {
-  const _CardTriaje();
+  const _CardTriaje({required this.onTap});
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
 
     return AppCard(
-      onTap: () {},
+      onTap: onTap,
       child: Row(
         children: [
           Container(
@@ -256,10 +372,7 @@ class _CardTriaje extends StatelessWidget {
               ],
             ),
           ),
-          const Icon(
-            Icons.chevron_right_rounded,
-            color: AppColors.textDisabled,
-          ),
+          const Icon(Icons.chevron_right_rounded, color: AppColors.textDisabled),
         ],
       ),
     );
@@ -281,11 +394,8 @@ class _CardTip extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(
-                Icons.lightbulb_outline_rounded,
-                color: AppColors.onPrimary,
-                size: 18,
-              ),
+              const Icon(Icons.lightbulb_outline_rounded,
+                  color: AppColors.onPrimary, size: 18),
               const SizedBox(width: AppSpacing.xs),
               Text(
                 'TIP DEL DÍA',
@@ -313,10 +423,12 @@ class _CardTip extends StatelessWidget {
 // ── Botón emergencia ──────────────────────────────────────────────────────────
 
 class _BotonEmergencia extends StatelessWidget {
+  const _BotonEmergencia();
+
   @override
   Widget build(BuildContext context) {
     return FloatingActionButton(
-      onPressed: () => _mostrarDialogoEmergencia(context),
+      onPressed: () => _mostrarDialogo(context),
       backgroundColor: AppColors.urgencyHigh,
       foregroundColor: AppColors.onPrimary,
       tooltip: 'Emergencia',
@@ -324,9 +436,7 @@ class _BotonEmergencia extends StatelessWidget {
     );
   }
 
-  void _mostrarDialogoEmergencia(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-
+  void _mostrarDialogo(BuildContext context) {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
@@ -334,29 +444,24 @@ class _BotonEmergencia extends StatelessWidget {
           children: [
             const Icon(Icons.warning_rounded, color: AppColors.urgencyHigh),
             const SizedBox(width: AppSpacing.sm),
-            Text('Emergencia', style: textTheme.headlineSmall),
+            Text('Emergencia',
+                style: Theme.of(context).textTheme.headlineSmall),
           ],
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
-          children: [
+          children: const [
             _ContactoEmergencia(
-              nombre: 'SAMU',
-              numero: '106',
-              icono: Icons.local_hospital_rounded,
-            ),
-            const Divider(height: AppSpacing.md),
+                nombre: 'SAMU', numero: '106',
+                icono: Icons.local_hospital_rounded),
+            Divider(),
             _ContactoEmergencia(
-              nombre: 'Bomberos',
-              numero: '116',
-              icono: Icons.fire_truck_rounded,
-            ),
-            const Divider(height: AppSpacing.md),
+                nombre: 'Bomberos', numero: '116',
+                icono: Icons.fire_truck_rounded),
+            Divider(),
             _ContactoEmergencia(
-              nombre: 'Policía',
-              numero: '105',
-              icono: Icons.local_police_rounded,
-            ),
+                nombre: 'Policía', numero: '105',
+                icono: Icons.local_police_rounded),
           ],
         ),
         actions: [
@@ -383,17 +488,17 @@ class _ContactoEmergencia extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-
     return ListTile(
       contentPadding: EdgeInsets.zero,
       leading: Icon(icono, color: AppColors.urgencyHigh),
-      title: Text(nombre, style: textTheme.titleSmall),
+      title: Text(nombre,
+          style: Theme.of(context).textTheme.titleSmall),
       trailing: TextButton.icon(
         onPressed: () {},
         icon: const Icon(Icons.phone_rounded, size: 16),
         label: Text(numero),
-        style: TextButton.styleFrom(foregroundColor: AppColors.urgencyHigh),
+        style:
+            TextButton.styleFrom(foregroundColor: AppColors.urgencyHigh),
       ),
     );
   }
