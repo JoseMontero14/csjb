@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "61696974595",
+    "project_id": "csjb-4a224",
+    "storage_bucket": "csjb-4a224.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:61696974595:android:12131e6962effacb749336",
+        "android_client_info": {
+          "package_name": "com.example.csjb"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAkSP0SQzuwJFwT9V_Od3bb8zFHhscTUuk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
