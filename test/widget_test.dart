@@ -1,30 +1,28 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
 import 'package:csjb/main.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  testWidgets('App arranca y muestra LoginView', (tester) async {
+    await tester.pumpWidget(const CsjbApp());
+    await tester.pumpAndSettle();
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    // La ruta inicial es /login → el stub muestra su AppBar
+    expect(find.text('LoginView'), findsOneWidget);
+  });
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+  testWidgets('Theme usa Material 3 con color primary correcto', (tester) async {
+    await tester.pumpWidget(const CsjbApp());
+    await tester.pumpAndSettle();
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    // Se lee el tema desde el Scaffold de la ruta, no desde MaterialApp,
+    // porque M3 procesa colores en el subtree del navigator.
+    final context = tester.element(find.byType(Scaffold).first);
+    final theme = Theme.of(context);
+
+    expect(theme.useMaterial3, isTrue);
+    expect(theme.colorScheme.primary, const Color(0xFF5B2D8E));
+    expect(theme.colorScheme.secondary, const Color(0xFFF47920));
+    expect(theme.scaffoldBackgroundColor, const Color(0xFFFAFAF8));
   });
 }
