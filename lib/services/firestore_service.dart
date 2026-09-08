@@ -1,4 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../models/chat_model.dart';
+import '../models/mensaje_model.dart';
 import '../models/recordatorio_model.dart';
 import '../models/toma_model.dart';
 
@@ -130,4 +132,66 @@ class FirestoreService {
   }
 
   DateTime _soloFecha(DateTime dt) => DateTime(dt.year, dt.month, dt.day);
+
+  // ── Chats IA ───────────────────────────────────────────────────────────────
+
+  Future<List<ChatModel>> getChats(String uid) async {
+    final snap = await _db
+        .collection('chats_ia')
+        .where('uid', isEqualTo: uid)
+        .orderBy('creadoEn', descending: true)
+        .get();
+    return snap.docs.map(ChatModel.fromFirestore).toList();
+  }
+
+  Future<String> crearChat(ChatModel chat) async {
+    final ref = await _db.collection('chats_ia').add(chat.toFirestore());
+    return ref.id;
+  }
+
+  Future<void> actualizarChat(String chatId, {String? titulo, String? preview}) =>
+      _db.collection('chats_ia').doc(chatId).update({
+        'titulo': titulo,
+        'preview': preview,
+      }..removeWhere((_, v) => v == null));
+
+  Future<List<MensajeModel>> getMensajes(String chatId) async {
+    final snap = await _db
+        .collection('chats_ia')
+        .doc(chatId)
+        .collection('mensajes')
+        .orderBy('timestamp')
+        .get();
+    return snap.docs.map(MensajeModel.fromFirestore).toList();
+  }
+
+  Future<MensajeModel> agregarMensaje(
+      String chatId, MensajeModel mensaje) async {
+    final ref = await _db
+        .collection('chats_ia')
+        .doc(chatId)
+        .collection('mensajes')
+        .add(mensaje.toFirestore());
+    return MensajeModel(
+      id: ref.id,
+      rol: mensaje.rol,
+      texto: mensaje.texto,
+      timestamp: mensaje.timestamp,
+    );
+  }
+
+  /// Elimina un chat y todos sus mensajes en un batch atómico.
+  Future<void> eliminarChat(String chatId) async {
+    final mensajesSnap = await _db
+        .collection('chats_ia')
+        .doc(chatId)
+        .collection('mensajes')
+        .get();
+    final batch = _db.batch();
+    for (final doc in mensajesSnap.docs) {
+      batch.delete(doc.reference);
+    }
+    batch.delete(_db.collection('chats_ia').doc(chatId));
+    await batch.commit();
+  }
 }

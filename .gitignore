@@ -1,3 +1,6 @@
+# Secretos — nunca subir
+lib/utils/constants.dart
+
 # Miscellaneous
 *.class
 *.log

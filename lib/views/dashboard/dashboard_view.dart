@@ -5,6 +5,7 @@ import '../../models/toma_model.dart';
 import '../../utils/routes.dart';
 import '../../utils/theme.dart';
 import '../../widgets/app_card.dart';
+import '../../widgets/urgency_badge.dart';
 
 // UID placeholder hasta integrar AuthController global
 const _kUidPlaceholder = 'uid-placeholder';
@@ -67,6 +68,8 @@ class _DashboardViewState extends State<DashboardView> with RouteAware {
           controller: _controller,
           onMedicacionTap: () => _pushAndRefresh(AppRoutes.medicacion),
           onTriajeTap: () => _pushAndRefresh(AppRoutes.triajeSintomas),
+          onTriajeHistorialTap: () =>
+              _pushAndRefresh(AppRoutes.triajeHistorial),
         ),
       ),
       floatingActionButton: const _BotonEmergencia(),
@@ -117,11 +120,13 @@ class _DashboardBody extends StatelessWidget {
     required this.controller,
     required this.onMedicacionTap,
     required this.onTriajeTap,
+    required this.onTriajeHistorialTap,
   });
 
   final DashboardController controller;
   final VoidCallback onMedicacionTap;
   final VoidCallback onTriajeTap;
+  final VoidCallback onTriajeHistorialTap;
 
   @override
   Widget build(BuildContext context) {
@@ -135,7 +140,11 @@ class _DashboardBody extends StatelessWidget {
           const SizedBox(height: AppSpacing.md),
           _CardRecordatorio(controller: controller, onTap: onMedicacionTap),
           const SizedBox(height: AppSpacing.md),
-          _CardTriaje(onTap: onTriajeTap),
+          _CardTriaje(
+            controller: controller,
+            onNuevoTriajeTap: onTriajeTap,
+            onHistorialTap: onTriajeHistorialTap,
+          ),
           const SizedBox(height: AppSpacing.md),
           const _CardTip(),
           const SizedBox(height: AppSpacing.xxl),
@@ -337,29 +346,85 @@ class _ProximaTomaTile extends StatelessWidget {
 // ── Card 3: Triaje ────────────────────────────────────────────────────────────
 
 class _CardTriaje extends StatelessWidget {
-  const _CardTriaje({required this.onTap});
-  final VoidCallback onTap;
+  const _CardTriaje({
+    required this.controller,
+    required this.onNuevoTriajeTap,
+    required this.onHistorialTap,
+  });
+
+  final DashboardController controller;
+  final VoidCallback onNuevoTriajeTap;
+  final VoidCallback onHistorialTap;
+
+  String _fechaRelativa(DateTime fecha) {
+    final diff = DateTime.now().difference(fecha);
+    if (diff.inDays == 0) return 'Hoy';
+    if (diff.inDays == 1) return 'Hace 1 día';
+    if (diff.inDays < 7) return 'Hace ${diff.inDays} días';
+    if (diff.inDays < 14) return 'Hace 1 semana';
+    return DateFormat('d MMM', 'es').format(fecha);
+  }
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final data = controller.data;
+
+    if (!data.tieneTriaje) {
+      // Sin triajes guardados: toca para hacer uno nuevo
+      return AppCard(
+        onTap: onNuevoTriajeTap,
+        child: Row(
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: AppColors.urgencyLowBg,
+                borderRadius: AppRadius.mdBr,
+              ),
+              child: const Icon(
+                Icons.health_and_safety_outlined,
+                color: AppColors.urgencyLow,
+                size: 26,
+              ),
+            ),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Último triaje', style: textTheme.titleSmall),
+                  const SizedBox(height: 4),
+                  Text('Sin triajes guardados',
+                      style: textTheme.bodySmall
+                          ?.copyWith(color: AppColors.textSecondary)),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right_rounded,
+                color: AppColors.textDisabled),
+          ],
+        ),
+      );
+    }
+
+    // Con triaje guardado: toca para ver el historial
+    final nivel = data.ultimoTriajeNivel!;
+    final fecha = data.ultimoTriajeFecha!;
 
     return AppCard(
-      onTap: onTap,
+      onTap: onHistorialTap,
       child: Row(
         children: [
           Container(
             width: 48,
             height: 48,
             decoration: BoxDecoration(
-              color: AppColors.urgencyLowBg,
+              color: nivel.backgroundColor,
               borderRadius: AppRadius.mdBr,
             ),
-            child: const Icon(
-              Icons.health_and_safety_outlined,
-              color: AppColors.urgencyLow,
-              size: 26,
-            ),
+            child: Icon(nivel.icon, color: nivel.color, size: 26),
           ),
           const SizedBox(width: AppSpacing.md),
           Expanded(
@@ -368,7 +433,17 @@ class _CardTriaje extends StatelessWidget {
               children: [
                 Text('Último triaje', style: textTheme.titleSmall),
                 const SizedBox(height: 4),
-                Text('Sin triajes', style: textTheme.bodySmall),
+                Row(
+                  children: [
+                    UrgencyBadge(nivel, size: BadgeSize.small),
+                    const SizedBox(width: AppSpacing.xs),
+                    Text(
+                      '· ${_fechaRelativa(fecha)}',
+                      style: textTheme.bodySmall
+                          ?.copyWith(color: AppColors.textSecondary),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),

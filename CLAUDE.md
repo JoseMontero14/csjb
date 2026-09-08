@@ -10,17 +10,17 @@
 - Flutter/Dart — frontend mobile (Android + iOS)
 - Firebase Auth — autenticación correo/contraseña
 - Firestore — base de datos principal
-- Firebase Cloud Functions — intermediario seguro con OpenAI
+- Firebase Cloud Functions — intermediario seguro con Gemini (producción)
 - FCM — notificaciones de medicamentos y seguimiento de triaje
 - Firebase Storage — fotos de médicos
-- OpenAI GPT-4o — chat IA y triaje
-- OpenAI GPT-4o Mini — tips de salud diarios
-- Durante desarrollo: Ollama local → swap a GPT-4o al finalizar
+- Google Gemini 1.5 Flash — chat IA y triaje
+- Google Gemini 1.5 Flash — tips de salud diarios
+- Durante desarrollo: Gemini REST API directo desde Flutter (TODO: mover a Cloud Functions antes de producción)
 
 ## Arquitectura
 - Patrón MVC + backend serverless Firebase
-- Flutter NUNCA llama directo a OpenAI
-- Flujo: Flutter → Cloud Function → OpenAI → respuesta al cliente
+- En desarrollo: Flutter llama Gemini REST API directo (key en constants.dart, excluida de git)
+- En producción: Flutter → Cloud Function → Gemini → respuesta al cliente
 - Roles admin via Firebase Custom Claims (sin colección "admins")
 
 ## Módulos y pantallas
@@ -126,9 +126,9 @@ examenes/{examenId}
 - Bottom navigation bar: 5 tabs (Inicio, Chat, Triaje, Exámenes, Médicos)
 
 ## Reglas estrictas
-- NUNCA llamar OpenAI directamente desde Flutter
+- En producción: NUNCA llamar Gemini directamente desde Flutter (usar Cloud Functions)
+- En desarrollo: constants.dart con la API key está en .gitignore — nunca comitear la key real
 - NUNCA guardar resultados de triaje sin acción explícita del usuario
-- NUNCA exponer API keys en el cliente Flutter
 - NUNCA crear colección "admins" en Firestore (usar Firebase Custom Claims)
 - El texto de la IA NUNCA debe dar diagnósticos, solo orientación informativa
 - La app funciona autónomamente, sin integración con staff de la clínica

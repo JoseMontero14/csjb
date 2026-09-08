@@ -40,6 +40,8 @@ dependencies:
   firebase_messaging: ^16.6.0
   firebase_storage: ^13.5.0
   cloud_functions: ^6.4.0
+  http: ^1.2.2
+  flutter_markdown_plus: ^1.0.12
   google_fonts: ^8.2.1
   intl: ^0.20.2
   flutter_localizations:

@@ -1,6 +1,8 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import '../models/toma_model.dart';
 import '../services/firestore_service.dart';
+import '../utils/theme.dart';
 
 class DashboardData {
   const DashboardData({
@@ -8,14 +10,19 @@ class DashboardData {
     required this.totalHoy,
     required this.tomadasHoy,
     required this.proximaToma,
+    this.ultimoTriajeNivel,
+    this.ultimoTriajeFecha,
   });
 
-  final int bienestarPct;       // 0-100
+  final int bienestarPct;
   final int totalHoy;
   final int tomadasHoy;
-  final TomaConRecordatorio? proximaToma; // null = sin pendientes
+  final TomaConRecordatorio? proximaToma;
+  final UrgencyLevel? ultimoTriajeNivel;
+  final DateTime? ultimoTriajeFecha;
 
   bool get sinRegistros => totalHoy == 0;
+  bool get tieneTriaje => ultimoTriajeNivel != null;
 }
 
 enum DashboardStatus { idle, loading, loaded, error }
@@ -25,6 +32,8 @@ class DashboardController extends ChangeNotifier {
       : _service = service ?? FirestoreService();
 
   final FirestoreService _service;
+
+  final FirebaseFirestore _db = FirebaseFirestore.instance;
 
   DashboardStatus _status = DashboardStatus.idle;
   DashboardData _data = const DashboardData(
@@ -57,11 +66,15 @@ class DashboardController extends ChangeNotifier {
         ..sort((a, b) => _minutosDesdeAhora(a.toma.hora, now)
             .compareTo(_minutosDesdeAhora(b.toma.hora, now)));
 
+      final (:nivelTriaje, :fechaTriaje) = await _ultimoTriaje(uid);
+
       _data = DashboardData(
         bienestarPct: pct,
         totalHoy: total,
         tomadasHoy: tomadas,
         proximaToma: pendientes.isEmpty ? null : pendientes.first,
+        ultimoTriajeNivel: nivelTriaje,
+        ultimoTriajeFecha: fechaTriaje,
       );
       _status = DashboardStatus.loaded;
     } catch (e, st) {
@@ -71,6 +84,31 @@ class DashboardController extends ChangeNotifier {
     }
 
     notifyListeners();
+  }
+
+  Future<({UrgencyLevel? nivelTriaje, DateTime? fechaTriaje})>
+      _ultimoTriaje(String uid) async {
+    try {
+      final snap = await _db
+          .collection('triajes')
+          .where('uid', isEqualTo: uid)
+          .where('guardado', isEqualTo: true)
+          .orderBy('fecha', descending: true)
+          .limit(1)
+          .get();
+      if (snap.docs.isEmpty) return (nivelTriaje: null, fechaTriaje: null);
+      final d = snap.docs.first.data();
+      final nivelStr = d['nivelUrgencia'] as String?;
+      final fecha = (d['fecha'] as Timestamp?)?.toDate();
+      final nivel = UrgencyLevel.values.firstWhere(
+        (e) => e.name == nivelStr,
+        orElse: () => UrgencyLevel.medium,
+      );
+      return (nivelTriaje: nivel, fechaTriaje: fecha);
+    } catch (e, st) {
+      debugPrint('DashboardController._ultimoTriaje: $e\n$st');
+      return (nivelTriaje: null, fechaTriaje: null);
+    }
   }
 
   /// Minutos desde ahora hasta la hora "HH:mm" (puede ser negativo si ya pasó).

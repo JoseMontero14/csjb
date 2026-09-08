@@ -1,0 +1,22 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "chats_ia",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "uid",      "order": "ASCENDING"  },
+        { "fieldPath": "creadoEn", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "triajes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "guardado", "order": "ASCENDING"  },
+        { "fieldPath": "uid",      "order": "ASCENDING"  },
+        { "fieldPath": "fecha",    "order": "DESCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}
