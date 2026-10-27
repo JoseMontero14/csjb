@@ -19,6 +19,19 @@ class MedicoModel {
   final String horario;
   final String descripcionEspecialidad;
 
+  /// Especialidad formateada para mostrar en la UI (title case).
+  String get especialidadDisplay {
+    const minors = {'y', 'de', 'del', 'la', 'las', 'los', 'e'};
+    return especialidad
+        .toLowerCase()
+        .split(' ')
+        .indexed
+        .map((e) => (e.$1 == 0 || !minors.contains(e.$2))
+            ? '${e.$2[0].toUpperCase()}${e.$2.substring(1)}'
+            : e.$2)
+        .join(' ');
+  }
+
   static MedicoModel fromFirestore(DocumentSnapshot doc) {
     final d = doc.data() as Map<String, dynamic>;
     return MedicoModel(

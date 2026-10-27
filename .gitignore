@@ -1,6 +1,10 @@
 # Secretos — nunca subir
 lib/utils/constants.dart
 
+# Claude Code
+.claude/
+CLAUDE.md
+
 # Miscellaneous
 *.class
 *.log

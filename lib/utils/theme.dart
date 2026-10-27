@@ -3,9 +3,11 @@ import 'package:google_fonts/google_fonts.dart';
 
 abstract final class AppColors {
   // Brand
-  static const primary = Color(0xFF5B2D8E);
-  static const primaryLight = Color(0xFF7B4DB3);
-  static const primaryDark = Color(0xFF3D1A6E);
+  static const primary = Color(0xFF6B48FF);
+  static const primaryLight = Color(0xFFA78BFA);
+  static const primaryLightBg = Color(0xFFEDE9FF);
+  static const primaryBorder = Color(0xFFECEAFE);
+  static const primaryDark = Color(0xFF4B2FD9);
   static const onPrimary = Colors.white;
 
   static const accent = Color(0xFFF47920);
@@ -13,14 +15,19 @@ abstract final class AppColors {
   static const accentDark = Color(0xFFD4620F);
   static const onAccent = Colors.white;
 
+  // Teal médico — usado en cards e ilustraciones
+  static const teal = Color(0xFF00697A);
+  static const tealLight = Color(0xFFD1EFEC);
+
   // Background / surface
-  static const background = Color(0xFFFAFAF8);
+  static const background = Color(0xFFF5F4F8);
   static const surface = Colors.white;
-  static const surfaceVariant = Color(0xFFF3EEF8);
+  static const surfaceVariant = Color(0xFFF8F7FF);
 
   // Text
-  static const textPrimary = Color(0xFF1A1A2E);
-  static const textSecondary = Color(0xFF6B6B80);
+  static const textPrimary = Color(0xFF111111);
+  static const textSecondary = Color(0xFF6B7280);
+  static const textMuted = Color(0xFF9CA3AF);
   static const textDisabled = Color(0xFFB0B0C0);
   static const textOnDark = Colors.white;
 
@@ -32,10 +39,27 @@ abstract final class AppColors {
   static const urgencyHigh = Color(0xFFC62828);
   static const urgencyHighBg = Color(0xFFFFEBEE);
 
+  // Category colors
+  static const catPurpleBg = Color(0xFFEDE9FF);
+  static const catPurpleText = Color(0xFF6B48FF);
+  static const catGreenBg = Color(0xFFE6F8F3);
+  static const catGreenText = Color(0xFF0FA46E);
+  static const catBlueBg = Color(0xFFE8F4FF);
+  static const catBlueText = Color(0xFF2563EB);
+  static const catYellowBg = Color(0xFFFEF3C7);
+  static const catYellowText = Color(0xFFD97706);
+  static const catRedBg = Color(0xFFFDEAEA);
+  static const catRedText = Color(0xFFDC2626);
+  static const catMintBg = Color(0xFFD1FAE5);
+  static const catMintText = Color(0xFF059669);
+
+  // Danger
+  static const danger = Color(0xFFE8304A);
+
   // UI
-  static const divider = Color(0xFFE8E8EC);
+  static const divider = Color(0xFFF0EEF8);
   static const shadow = Color(0x14000000);
-  static const cardBorder = Color(0xFFF0EDF6);
+  static const cardBorder = Color(0xFFECEAFE);
 }
 
 abstract final class AppRadius {
@@ -126,6 +150,7 @@ abstract final class AppTheme {
       inputDecorationTheme: _inputDecorationTheme(),
       chipTheme: _chipTheme(),
       bottomNavigationBarTheme: _bottomNavTheme(),
+      navigationBarTheme: _navigationBarTheme(),
       bottomSheetTheme: _bottomSheetTheme(),
       dividerTheme: const DividerThemeData(
         color: AppColors.divider,
@@ -269,17 +294,21 @@ abstract final class AppTheme {
         backgroundColor: AppColors.surface,
         foregroundColor: AppColors.textPrimary,
         elevation: AppElevation.none,
-        scrolledUnderElevation: 1,
+        scrolledUnderElevation: 0.5,
         shadowColor: AppColors.shadow,
         centerTitle: false,
         titleTextStyle: GoogleFonts.poppins(
           fontSize: 18,
-          fontWeight: FontWeight.w700,
+          fontWeight: FontWeight.w900,
           color: AppColors.textPrimary,
+          letterSpacing: -0.3,
         ),
-        iconTheme: const IconThemeData(color: AppColors.textPrimary),
-        actionsIconTheme: const IconThemeData(color: AppColors.textPrimary),
+        iconTheme: const IconThemeData(color: AppColors.textPrimary, size: 22),
+        actionsIconTheme: const IconThemeData(color: AppColors.primary, size: 22),
         surfaceTintColor: Colors.transparent,
+        shape: const Border(
+          bottom: BorderSide(color: AppColors.cardBorder, width: 1),
+        ),
       );
 
   static CardThemeData _cardTheme() => CardThemeData(
@@ -423,6 +452,36 @@ abstract final class AppTheme {
           fontSize: 11,
           fontWeight: FontWeight.w400,
         ),
+      );
+
+  static NavigationBarThemeData _navigationBarTheme() =>
+      NavigationBarThemeData(
+        backgroundColor: AppColors.surface,
+        indicatorColor: AppColors.primary.withAlpha(22),
+        iconTheme: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return const IconThemeData(color: AppColors.primary, size: 24);
+          }
+          return const IconThemeData(color: AppColors.textSecondary, size: 24);
+        }),
+        labelTextStyle: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return GoogleFonts.poppins(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: AppColors.primary,
+            );
+          }
+          return GoogleFonts.poppins(
+            fontSize: 11,
+            fontWeight: FontWeight.w400,
+            color: AppColors.textSecondary,
+          );
+        }),
+        elevation: 0,
+        surfaceTintColor: Colors.transparent,
+        shadowColor: Colors.transparent,
+        overlayColor: WidgetStateProperty.all(Colors.transparent),
       );
 
   static BottomSheetThemeData _bottomSheetTheme() => BottomSheetThemeData(

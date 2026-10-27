@@ -23,12 +23,33 @@ class FirestoreService {
         .toList();
   }
 
+  /// Stream en tiempo real de los recordatorios activos del usuario.
+  Stream<List<RecordatorioModel>> streamRecordatoriosActivos(String uid) {
+    return _db
+        .collection('recordatorios')
+        .where('uid', isEqualTo: uid)
+        .snapshots()
+        .map((snap) => snap.docs
+            .map(RecordatorioModel.fromFirestore)
+            .where((r) => r.activo)
+            .toList());
+  }
+
   Future<String> agregarRecordatorio(RecordatorioModel recordatorio) async {
     final ref = await _db
         .collection('recordatorios')
         .add(recordatorio.toFirestore());
     return ref.id;
   }
+
+  Future<void> actualizarRecordatorio(
+    String recordatorioId,
+    RecordatorioModel recordatorio,
+  ) =>
+      _db
+          .collection('recordatorios')
+          .doc(recordatorioId)
+          .update(recordatorio.toFirestore());
 
   Future<void> eliminarRecordatorio(String recordatorioId) =>
       _db.collection('recordatorios').doc(recordatorioId).delete();
@@ -82,6 +103,7 @@ class FirestoreService {
         resultado.add(TomaConRecordatorio(
           toma: toma,
           medicamento: rec.medicamento,
+          presentacion: rec.presentacion,
           dosis: rec.dosis,
         ));
       }
@@ -103,6 +125,14 @@ class FirestoreService {
           .collection('historial_tomas')
           .doc(tomaId)
           .update({'tomado': tomado});
+
+  /// Alias llamado desde el handler de notificaciones en background.
+  Future<void> marcarTomaDesdeNotificacion(
+    String recordatorioId,
+    String tomaId,
+    bool tomado,
+  ) =>
+      marcarToma(recordatorioId, tomaId, tomado);
 
   /// Calcula porcentaje de adherencia de los últimos 7 días (0.0 – 1.0).
   Future<double> getAdherenciaSemanal(String uid) async {

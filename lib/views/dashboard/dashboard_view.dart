@@ -1,14 +1,26 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:intl/intl.dart';
 import '../../controllers/dashboard_controller.dart';
-import '../../models/toma_model.dart';
+import '../../controllers/tip_controller.dart';
+import '../../models/tip_model.dart';
+import '../../models/usuario_model.dart';
 import '../../utils/routes.dart';
 import '../../utils/theme.dart';
-import '../../widgets/app_card.dart';
+import '../../widgets/bottom_nav.dart';
 import '../../widgets/urgency_badge.dart';
 
-// UID placeholder hasta integrar AuthController global
-const _kUidPlaceholder = 'uid-placeholder';
+String get _uid => FirebaseAuth.instance.currentUser?.uid ?? '';
+
+// ── Paleta de tarjetas (inspirada en referencia de la clínica) ────────────────
+
+const _kLavender = Color(0xFFEDE5FF);
+const _kTeal     = Color(0xFFD1EFEC);
+const _kBlue     = Color(0xFFD6EBFA);
+
+// ── Vista principal ───────────────────────────────────────────────────────────
 
 class DashboardView extends StatefulWidget {
   const DashboardView({super.key});
@@ -33,9 +45,8 @@ class _DashboardViewState extends State<DashboardView> with RouteAware {
     super.dispose();
   }
 
-  void _cargar() => _controller.cargar(_kUidPlaceholder);
+  void _cargar() => _controller.cargar(_uid);
 
-  /// Navega a una ruta y recarga el dashboard al volver.
   Future<void> _pushAndRefresh(String route) async {
     await AppRoutes.push(context, route);
     if (mounted) _cargar();
@@ -59,102 +70,247 @@ class _DashboardViewState extends State<DashboardView> with RouteAware {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      appBar: _buildAppBar(context),
-      body: ListenableBuilder(
-        listenable: _controller,
-        builder: (context, _) => _DashboardBody(
+    return ListenableBuilder(
+      listenable: _controller,
+      builder: (context, _) => Scaffold(
+        backgroundColor: AppColors.background,
+        body: _DashboardBody(
           controller: _controller,
+          onPerfilTap: () => AppRoutes.push(context, AppRoutes.perfil),
           onMedicacionTap: () => _pushAndRefresh(AppRoutes.medicacion),
           onTriajeTap: () => _pushAndRefresh(AppRoutes.triajeSintomas),
           onTriajeHistorialTap: () =>
               _pushAndRefresh(AppRoutes.triajeHistorial),
         ),
-      ),
-      floatingActionButton: const _BotonEmergencia(),
-      bottomNavigationBar: _BottomNav(
-        currentIndex: _tabIndex,
-        onTap: _onTabTap,
-      ),
-    );
-  }
-
-  AppBar _buildAppBar(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    final now = DateTime.now();
-    final fecha =
-        DateFormat("EEEE d 'de' MMMM", 'es').format(now).toUpperCase();
-
-    return AppBar(
-      automaticallyImplyLeading: false,
-      title: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            fecha,
-            style: textTheme.labelSmall?.copyWith(
-              color: AppColors.textSecondary,
-              letterSpacing: 0.8,
-            ),
-          ),
-          const Text('Hola, José'),
-        ],
-      ),
-      actions: [
-        IconButton(
-          icon: const Icon(Icons.person_outline_rounded),
-          onPressed: () => AppRoutes.push(context, AppRoutes.perfil),
-          tooltip: 'Perfil',
+        floatingActionButton: const _BotonEmergencia(),
+        bottomNavigationBar: AppBottomNav(
+          currentIndex: _tabIndex,
+          onTap: _onTabTap,
         ),
-        const SizedBox(width: AppSpacing.xs),
-      ],
+      ),
     );
   }
 }
 
-// ── Body ─────────────────────────────────────────────────────────────────────
+// ── Body ──────────────────────────────────────────────────────────────────────
 
 class _DashboardBody extends StatelessWidget {
   const _DashboardBody({
     required this.controller,
+    required this.onPerfilTap,
     required this.onMedicacionTap,
     required this.onTriajeTap,
     required this.onTriajeHistorialTap,
   });
 
   final DashboardController controller;
+  final VoidCallback onPerfilTap;
   final VoidCallback onMedicacionTap;
   final VoidCallback onTriajeTap;
   final VoidCallback onTriajeHistorialTap;
 
   @override
   Widget build(BuildContext context) {
-    return RefreshIndicator(
-      color: AppColors.primary,
-      onRefresh: () => controller.cargar(_kUidPlaceholder),
-      child: ListView(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        children: [
-          _CardBienestar(controller: controller, onTap: onMedicacionTap),
-          const SizedBox(height: AppSpacing.md),
-          _CardRecordatorio(controller: controller, onTap: onMedicacionTap),
-          const SizedBox(height: AppSpacing.md),
-          _CardTriaje(
-            controller: controller,
-            onNuevoTriajeTap: onTriajeTap,
-            onHistorialTap: onTriajeHistorialTap,
+    return Column(
+      children: [
+        _HeaderSimple(
+          nombre: controller.data.nombre,
+          onPerfilTap: onPerfilTap,
+        ),
+        Expanded(
+          child: RefreshIndicator(
+            color: AppColors.primary,
+            onRefresh: () => controller.cargar(_uid),
+            child: ListView(
+              padding: EdgeInsets.fromLTRB(
+                AppSpacing.md, AppSpacing.md, AppSpacing.md,
+                // Espacio extra para que el FAB no tape el último item
+                AppSpacing.xxl + 56 + MediaQuery.of(context).padding.bottom,
+              ),
+              children: [
+                _CardBienestar(
+                    controller: controller, onTap: onMedicacionTap),
+                const SizedBox(height: AppSpacing.sm),
+                _CardRecordatorio(
+                    controller: controller, onTap: onMedicacionTap),
+                const SizedBox(height: AppSpacing.sm),
+                _CardTriaje(
+                  controller: controller,
+                  onNuevoTriajeTap: onTriajeTap,
+                  onHistorialTap: onTriajeHistorialTap,
+                ),
+                const SizedBox(height: AppSpacing.xl),
+                _SeccionTips(),
+              ],
+            ),
           ),
-          const SizedBox(height: AppSpacing.md),
-          const _CardTip(),
-          const SizedBox(height: AppSpacing.xxl),
-        ],
+        ),
+      ],
+    );
+  }
+}
+
+// ── Header simple (estilo referencia: blanco + logo + saludo) ─────────────────
+
+class _HeaderSimple extends StatelessWidget {
+  const _HeaderSimple({required this.nombre, required this.onPerfilTap});
+
+  final String nombre;
+  final VoidCallback onPerfilTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final now = DateTime.now();
+    final fecha = DateFormat("EEEE, d 'de' MMMM", 'es').format(now);
+
+    return Container(
+      color: AppColors.surface,
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.md, AppSpacing.sm, AppSpacing.md, AppSpacing.md,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Logo + Nombre clínica + botón perfil
+              Row(
+                children: [
+                  ClipOval(
+                    child: Image.asset(
+                      'assets/logo_csjb.png',
+                      width: 36,
+                      height: 36,
+                      fit: BoxFit.contain,
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: Text(
+                      'Clínica San Juan Bautista',
+                      style: TextStyle(
+                        color: AppColors.primary,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.1,
+                      ),
+                    ),
+                  ),
+                  Material(
+                    color: AppColors.primary.withAlpha(12),
+                    shape: const CircleBorder(),
+                    child: InkWell(
+                      customBorder: const CircleBorder(),
+                      onTap: onPerfilTap,
+                      child: const Padding(
+                        padding: EdgeInsets.all(9),
+                        child: Icon(
+                          Icons.person_outline_rounded,
+                          color: AppColors.primary,
+                          size: 20,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              // Fecha
+              Text(
+                fecha,
+                style: const TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w400,
+                ),
+              ),
+              const SizedBox(height: 2),
+              // Saludo
+              Text(
+                nombre.isNotEmpty ? 'Hola, $nombre 👋' : 'Hola 👋',
+                style: const TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 24,
+                  fontWeight: FontWeight.w800,
+                  height: 1.1,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
 }
 
-// ── Card 1: Bienestar ─────────────────────────────────────────────────────────
+// ── Tarjeta ilustrada base (estilo referencia) ────────────────────────────────
+
+class _IlluCard extends StatelessWidget {
+  const _IlluCard({
+    required this.bg,
+    required this.svgAsset,
+    required this.onTap,
+    required this.content,
+    this.svgHeight = 130,
+    });
+
+  final Color bg;
+  final String svgAsset;
+  final VoidCallback? onTap;
+  final Widget content;
+  final double svgHeight;
+
+  @override
+  Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final cardHeight = (screenWidth * 0.37).clamp(120.0, 150.0);
+    final illuWidth = (screenWidth * 0.37).clamp(110.0, 150.0);
+
+    return Material(
+      color: bg,
+      borderRadius: AppRadius.xlBr,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: AppRadius.xlBr,
+        splashColor: Colors.black.withAlpha(10),
+        child: SizedBox(
+          height: cardHeight,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              // Ilustración — lado izquierdo
+              SizedBox(
+                width: illuWidth,
+                height: cardHeight,
+                child: Align(
+                  alignment: Alignment.bottomLeft,
+                  child: SvgPicture.asset(
+                    svgAsset,
+                    height: svgHeight,
+                    fit: BoxFit.contain,
+                  ),
+                ),
+              ),
+              // Contenido — lado derecho
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(0, AppSpacing.md, AppSpacing.md, AppSpacing.md),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: content,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Tarjeta Bienestar ─────────────────────────────────────────────────────────
 
 class _CardBienestar extends StatelessWidget {
   const _CardBienestar({required this.controller, required this.onTap});
@@ -164,81 +320,94 @@ class _CardBienestar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
+    final tt = Theme.of(context).textTheme;
     final data = controller.data;
     final isLoading = controller.isLoading;
-
     final pct = data.bienestarPct;
     final value = data.totalHoy == 0 ? 0.0 : pct / 100.0;
+    final ringColor = pct >= 80
+        ? AppColors.urgencyLow
+        : pct >= 50
+            ? AppColors.accent
+            : const Color(0xFFEF5350);
 
-    return AppCard(
+    return _IlluCard(
+      bg: _kLavender,
+      svgAsset: 'assets/il_doctor_header.svg',
       onTap: onTap,
-      child: Row(
+      svgHeight: 125,
+      content: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          SizedBox(
-            width: 72,
-            height: 72,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                if (isLoading)
-                  const CircularProgressIndicator(strokeWidth: 7)
-                else
+          Row(
+            children: [
+              Icon(Icons.favorite_rounded, color: AppColors.primary, size: 14),
+              const SizedBox(width: 5),
+              Text(
+                'Bienestar',
+                style: tt.labelMedium?.copyWith(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 5),
+          if (isLoading)
+            SizedBox(
+              width: 60,
+              height: 60,
+              child: CircularProgressIndicator(
+                strokeWidth: 6,
+                color: AppColors.primary.withAlpha(60),
+              ),
+            )
+          else
+            SizedBox(
+              width: 68,
+              height: 68,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
                   CircularProgressIndicator(
                     value: value,
                     strokeWidth: 7,
-                    backgroundColor: AppColors.surfaceVariant,
-                    color: AppColors.primary,
+                    backgroundColor: ringColor.withAlpha(25),
+                    color: ringColor,
                     strokeCap: StrokeCap.round,
                   ),
-                if (!isLoading)
                   Center(
                     child: Text(
                       '$pct%',
-                      style: textTheme.titleMedium?.copyWith(
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.w700,
+                      style: tt.titleMedium?.copyWith(
+                        color: ringColor,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 17,
+                        letterSpacing: -0.5,
                       ),
                     ),
                   ),
-              ],
-            ),
-          ),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Bienestar general', style: textTheme.titleSmall),
-                const SizedBox(height: 4),
-                if (isLoading)
-                  Text('Cargando...', style: textTheme.bodySmall)
-                else if (data.sinRegistros)
-                  Text('Sin registros aún', style: textTheme.bodySmall)
-                else
-                  Text(
-                    '${data.tomadasHoy} de ${data.totalHoy} tomas hoy',
-                    style: textTheme.bodySmall,
-                  ),
-                if (!isLoading && data.sinRegistros) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    'Registra tus medicamentos para ver tu adherencia',
-                    style: textTheme.bodySmall
-                        ?.copyWith(color: AppColors.textDisabled, fontSize: 11),
-                  ),
                 ],
-              ],
+              ),
             ),
-          ),
-          const Icon(Icons.chevron_right_rounded, color: AppColors.textDisabled),
+          const SizedBox(height: 6),
+          if (!isLoading && !data.sinRegistros)
+            Text(
+              '${data.tomadasHoy}/${data.totalHoy} tomas',
+              style: tt.bodySmall?.copyWith(
+                color: AppColors.textSecondary,
+                fontSize: 11,
+              ),
+            ),
         ],
       ),
     );
   }
 }
 
-// ── Card 2: Próximo recordatorio ──────────────────────────────────────────────
+// ── Tarjeta Recordatorio ──────────────────────────────────────────────────────
 
 class _CardRecordatorio extends StatelessWidget {
   const _CardRecordatorio({required this.controller, required this.onTap});
@@ -248,102 +417,103 @@ class _CardRecordatorio extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
+    final tt = Theme.of(context).textTheme;
     final proxima = controller.data.proximaToma;
     final isLoading = controller.isLoading;
 
-    return AppCard(
+    return _IlluCard(
+      bg: _kTeal,
+      svgAsset: 'assets/il_medicacion_empty.svg',
       onTap: onTap,
-      child: Row(
+      svgHeight: 120,
+      content: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: proxima != null
-                  ? AppColors.surfaceVariant
-                  : AppColors.urgencyLowBg,
-              borderRadius: AppRadius.mdBr,
-            ),
-            child: Icon(
-              Icons.medication_outlined,
-              color: proxima != null
-                  ? AppColors.primary
-                  : AppColors.urgencyLow,
-              size: 26,
-            ),
+          Row(
+            children: [
+              Icon(Icons.alarm_rounded, color: const Color(0xFF00697A), size: 14),
+              const SizedBox(width: 5),
+              Text(
+                'Recordatorio',
+                style: tt.labelMedium?.copyWith(
+                  color: const Color(0xFF00697A),
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Próximo recordatorio', style: textTheme.titleSmall),
-                const SizedBox(height: 4),
-                if (isLoading)
-                  Text('Cargando...', style: textTheme.bodySmall)
-                else if (proxima == null)
-                  Text(
-                    controller.data.sinRegistros
-                        ? 'Sin recordatorios'
-                        : '¡Todas las tomas completadas hoy!',
-                    style: textTheme.bodySmall,
-                  )
-                else
-                  _ProximaTomaTile(proxima: proxima),
-              ],
+          const SizedBox(height: 8),
+          if (isLoading)
+            Text('Cargando…', style: tt.bodySmall)
+          else if (proxima == null)
+            Text(
+              controller.data.sinRegistros
+                  ? 'Sin recordatorios'
+                  : '¡Tomas completas!',
+              style: tt.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary,
+                fontSize: 15,
+                height: 1.3,
+              ),
+            )
+          else ...[
+            Text(
+              proxima.medicamento,
+              style: tt.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary,
+                fontSize: 15,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
-          ),
-          const Icon(Icons.chevron_right_rounded, color: AppColors.textDisabled),
+            const SizedBox(height: 3),
+            Text(
+              proxima.dosis,
+              style: tt.bodySmall?.copyWith(color: AppColors.textSecondary),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.white.withAlpha(200),
+                borderRadius: AppRadius.fullBr,
+              ),
+              child: Text(
+                _cuentaAtras(proxima.toma.hora),
+                style: tt.labelSmall?.copyWith(
+                  color: AppColors.accentDark,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 11,
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
   }
 }
 
-class _ProximaTomaTile extends StatelessWidget {
-  const _ProximaTomaTile({required this.proxima});
-  final TomaConRecordatorio proxima;
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          proxima.medicamento,
-          style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        Row(
-          children: [
-            Text(proxima.dosis, style: textTheme.bodySmall),
-            const SizedBox(width: AppSpacing.sm),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withAlpha(20),
-                borderRadius: AppRadius.fullBr,
-              ),
-              child: Text(
-                proxima.toma.hora,
-                style: textTheme.labelSmall?.copyWith(
-                  color: AppColors.primary,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
+/// Devuelve "en X min", "en Xh Ym" o "ahora".
+String _cuentaAtras(String hora) {
+  final parts = hora.split(':');
+  if (parts.length < 2) return hora;
+  final hh = int.tryParse(parts[0]) ?? 0;
+  final mm = int.tryParse(parts[1]) ?? 0;
+  final now = DateTime.now();
+  final diff = (hh * 60 + mm) - (now.hour * 60 + now.minute);
+  if (diff <= 0) return 'ahora';
+  if (diff < 60) return 'en $diff min';
+  final h = diff ~/ 60;
+  final m = diff % 60;
+  return m == 0 ? 'en ${h}h' : 'en ${h}h ${m}m';
 }
 
-// ── Card 3: Triaje ────────────────────────────────────────────────────────────
+// ── Tarjeta Triaje ────────────────────────────────────────────────────────────
 
 class _CardTriaje extends StatelessWidget {
   const _CardTriaje({
@@ -359,134 +529,303 @@ class _CardTriaje extends StatelessWidget {
   String _fechaRelativa(DateTime fecha) {
     final diff = DateTime.now().difference(fecha);
     if (diff.inDays == 0) return 'Hoy';
-    if (diff.inDays == 1) return 'Hace 1 día';
-    if (diff.inDays < 7) return 'Hace ${diff.inDays} días';
-    if (diff.inDays < 14) return 'Hace 1 semana';
+    if (diff.inDays == 1) return 'Ayer';
+    if (diff.inDays < 7) return 'Hace ${diff.inDays}d';
     return DateFormat('d MMM', 'es').format(fecha);
   }
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
+    final tt = Theme.of(context).textTheme;
     final data = controller.data;
+    final nivel = data.tieneTriaje ? data.ultimoTriajeNivel! : null;
 
-    if (!data.tieneTriaje) {
-      // Sin triajes guardados: toca para hacer uno nuevo
-      return AppCard(
-        onTap: onNuevoTriajeTap,
-        child: Row(
-          children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: AppColors.urgencyLowBg,
-                borderRadius: AppRadius.mdBr,
-              ),
-              child: const Icon(
-                Icons.health_and_safety_outlined,
-                color: AppColors.urgencyLow,
-                size: 26,
-              ),
-            ),
-            const SizedBox(width: AppSpacing.md),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Último triaje', style: textTheme.titleSmall),
-                  const SizedBox(height: 4),
-                  Text('Sin triajes guardados',
-                      style: textTheme.bodySmall
-                          ?.copyWith(color: AppColors.textSecondary)),
-                ],
-              ),
-            ),
-            const Icon(Icons.chevron_right_rounded,
-                color: AppColors.textDisabled),
-          ],
-        ),
-      );
-    }
-
-    // Con triaje guardado: toca para ver el historial
-    final nivel = data.ultimoTriajeNivel!;
-    final fecha = data.ultimoTriajeFecha!;
-
-    return AppCard(
-      onTap: onHistorialTap,
-      child: Row(
+    return _IlluCard(
+      bg: _kBlue,
+      svgAsset: 'assets/il_triaje_empty.svg',
+      onTap: data.tieneTriaje ? onHistorialTap : onNuevoTriajeTap,
+      svgHeight: 115,
+      content: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: nivel.backgroundColor,
-              borderRadius: AppRadius.mdBr,
-            ),
-            child: Icon(nivel.icon, color: nivel.color, size: 26),
-          ),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Último triaje', style: textTheme.titleSmall),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    UrgencyBadge(nivel, size: BadgeSize.small),
-                    const SizedBox(width: AppSpacing.xs),
-                    Text(
-                      '· ${_fechaRelativa(fecha)}',
-                      style: textTheme.bodySmall
-                          ?.copyWith(color: AppColors.textSecondary),
-                    ),
-                  ],
+          Row(
+            children: [
+              Icon(Icons.monitor_heart_rounded, color: const Color(0xFF1565C0), size: 14),
+              const SizedBox(width: 5),
+              Text(
+                'Triaje',
+                style: tt.labelMedium?.copyWith(
+                  color: const Color(0xFF1565C0),
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12,
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-          const Icon(Icons.chevron_right_rounded, color: AppColors.textDisabled),
+          const SizedBox(height: 8),
+          if (!data.tieneTriaje)
+            Text(
+              'Sin registros',
+              style: tt.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary,
+                fontSize: 15,
+              ),
+            )
+          else ...[
+            UrgencyBadge(nivel!, size: BadgeSize.small),
+            const SizedBox(height: 6),
+            Text(
+              _fechaRelativa(data.ultimoTriajeFecha!),
+              style: tt.bodySmall?.copyWith(color: AppColors.textSecondary),
+            ),
+          ],
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Text(
+                data.tieneTriaje ? 'Ver historial' : 'Iniciar triaje',
+                style: tt.labelSmall?.copyWith(
+                  color: const Color(0xFF1565C0),
+                  fontWeight: FontWeight.w600,
+                  fontSize: 11,
+                ),
+              ),
+              const SizedBox(width: 2),
+              Icon(Icons.arrow_forward_rounded,
+                  color: const Color(0xFF1565C0), size: 12),
+            ],
+          ),
         ],
       ),
     );
   }
 }
 
-// ── Card 4: Tip del día ───────────────────────────────────────────────────────
+// ── Sección "Tips para ti" ────────────────────────────────────────────────────
 
-class _CardTip extends StatelessWidget {
-  const _CardTip();
+class _SeccionTips extends StatefulWidget {
+  const _SeccionTips();
+
+  @override
+  State<_SeccionTips> createState() => _SeccionTipsState();
+}
+
+class _SeccionTipsState extends State<_SeccionTips> {
+  final _tipController = TipController();
+  bool _inicializado = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_inicializado) {
+      _inicializado = true;
+      _cargar();
+    }
+  }
+
+  @override
+  void dispose() {
+    _tipController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _cargar() async {
+    final uid = _uid;
+    if (uid.isEmpty) return;
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('usuarios')
+          .doc(uid)
+          .get();
+      final usuario = doc.exists
+          ? UsuarioModel.fromFirestore(doc)
+          : UsuarioModel(
+              uid: uid,
+              nombre: '',
+              correo: '',
+              sexo: Sexo.prefierNoDecir,
+              fechaNacimiento: DateTime(2000),
+              creadoEn: DateTime.now(),
+            );
+      if (mounted) await _tipController.cargar(uid, usuario);
+    } catch (e) {
+      debugPrint('_SeccionTips._cargar: $e');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
+    final tt = Theme.of(context).textTheme;
 
-    return AppCard.accent(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.lightbulb_outline_rounded,
-                  color: AppColors.onPrimary, size: 18),
-              const SizedBox(width: AppSpacing.xs),
-              Text(
-                'TIP DEL DÍA',
-                style: textTheme.labelSmall?.copyWith(
-                  color: AppColors.onPrimary.withAlpha(180),
-                  letterSpacing: 1.2,
-                ),
+    return ListenableBuilder(
+      listenable: _tipController,
+      builder: (context2, _) {
+        final tips = _tipController.tipsHoy;
+        final cargando = _tipController.cargando;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: AppColors.accent.withAlpha(25),
+                      borderRadius: AppRadius.smBr,
+                    ),
+                    child: const Icon(Icons.lightbulb_rounded,
+                        color: AppColors.accent, size: 16),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Text(
+                    'Tips para ti',
+                    style: tt.titleSmall?.copyWith(
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
+            if (cargando)
+              _TipCardEsqueleto()
+            else if (_tipController.status == TipStatus.error)
+              Text(
+                _tipController.errorMessage ?? 'No se pudieron cargar los tips.',
+                style: tt.bodySmall?.copyWith(color: AppColors.textSecondary),
+              )
+            else if (tips.isEmpty)
+              const SizedBox.shrink()
+            else
+              ...tips.map((tip) => Padding(
+                    padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                    child: _TipCardCompacta(tip: tip),
+                  )),
+          ],
+        );
+      },
+    );
+  }
+}
+
+Color _colorCategoria(TipCategoria cat) => switch (cat) {
+      TipCategoria.nutricion => const Color(0xFFE8F5E9),
+      TipCategoria.actividadFisica => const Color(0xFFE3F2FD),
+      TipCategoria.bienestarMental => const Color(0xFFF3E5F5),
+      TipCategoria.sueno => const Color(0xFFEDE7F6),
+      TipCategoria.hidratacion => const Color(0xFFE0F7FA),
+      TipCategoria.prevencion => const Color(0xFFFFF3E0),
+      TipCategoria.medicacion => const Color(0xFFFFEBEE),
+    };
+
+Color _iconCategoria(TipCategoria cat) => switch (cat) {
+      TipCategoria.nutricion => const Color(0xFF2E7D32),
+      TipCategoria.actividadFisica => const Color(0xFF1565C0),
+      TipCategoria.bienestarMental => const Color(0xFF6A1B9A),
+      TipCategoria.sueno => const Color(0xFF4527A0),
+      TipCategoria.hidratacion => const Color(0xFF00838F),
+      TipCategoria.prevencion => const Color(0xFFE65100),
+      TipCategoria.medicacion => const Color(0xFFC62828),
+    };
+
+class _TipCardCompacta extends StatelessWidget {
+  const _TipCardCompacta({required this.tip});
+  final TipModel tip;
+
+  @override
+  Widget build(BuildContext context) {
+    final tt = Theme.of(context).textTheme;
+    final bgIcon = _colorCategoria(tip.categoria);
+    final colorIcon = _iconCategoria(tip.categoria);
+
+    return Material(
+      color: AppColors.surface,
+      borderRadius: AppRadius.lgBr,
+      elevation: 0,
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: AppRadius.lgBr,
+          border: Border.all(color: AppColors.cardBorder),
+        ),
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: bgIcon,
+                borderRadius: AppRadius.smBr,
+              ),
+              child: Icon(tip.categoria.icon, color: colorIcon, size: 20),
+            ),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    tip.categoria.label.toUpperCase(),
+                    style: TextStyle(
+                      color: colorIcon,
+                      fontSize: 9,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.8,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    tip.texto,
+                    style: tt.bodySmall?.copyWith(
+                      color: AppColors.textPrimary,
+                      height: 1.45,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TipCardEsqueleto extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: AppRadius.lgBr,
+        border: Border.all(color: AppColors.cardBorder),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: AppColors.surfaceVariant,
+              borderRadius: AppRadius.smBr,
+            ),
           ),
-          const SizedBox(height: AppSpacing.sm),
-          Text(
-            'Cargando tip...',
-            style: textTheme.bodyMedium?.copyWith(
-              color: AppColors.onPrimary,
-              fontWeight: FontWeight.w500,
+          const SizedBox(width: AppSpacing.md),
+          Container(
+            height: 14,
+            width: 180,
+            decoration: BoxDecoration(
+              color: AppColors.surfaceVariant,
+              borderRadius: AppRadius.smBr,
             ),
           ),
         ],
@@ -527,15 +866,18 @@ class _BotonEmergencia extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: const [
             _ContactoEmergencia(
-                nombre: 'SAMU', numero: '106',
+                nombre: 'SAMU',
+                numero: '106',
                 icono: Icons.local_hospital_rounded),
             Divider(),
             _ContactoEmergencia(
-                nombre: 'Bomberos', numero: '116',
+                nombre: 'Bomberos',
+                numero: '116',
                 icono: Icons.fire_truck_rounded),
             Divider(),
             _ContactoEmergencia(
-                nombre: 'Policía', numero: '105',
+                nombre: 'Policía',
+                numero: '105',
                 icono: Icons.local_police_rounded),
           ],
         ),
@@ -566,59 +908,13 @@ class _ContactoEmergencia extends StatelessWidget {
     return ListTile(
       contentPadding: EdgeInsets.zero,
       leading: Icon(icono, color: AppColors.urgencyHigh),
-      title: Text(nombre,
-          style: Theme.of(context).textTheme.titleSmall),
+      title: Text(nombre, style: Theme.of(context).textTheme.titleSmall),
       trailing: TextButton.icon(
         onPressed: () {},
         icon: const Icon(Icons.phone_rounded, size: 16),
         label: Text(numero),
-        style:
-            TextButton.styleFrom(foregroundColor: AppColors.urgencyHigh),
+        style: TextButton.styleFrom(foregroundColor: AppColors.urgencyHigh),
       ),
-    );
-  }
-}
-
-// ── Bottom Navigation ─────────────────────────────────────────────────────────
-
-class _BottomNav extends StatelessWidget {
-  const _BottomNav({required this.currentIndex, required this.onTap});
-
-  final int currentIndex;
-  final void Function(int) onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return BottomNavigationBar(
-      currentIndex: currentIndex,
-      onTap: onTap,
-      items: const [
-        BottomNavigationBarItem(
-          icon: Icon(Icons.home_outlined),
-          activeIcon: Icon(Icons.home_rounded),
-          label: 'Inicio',
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.chat_bubble_outline_rounded),
-          activeIcon: Icon(Icons.chat_bubble_rounded),
-          label: 'Chat',
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.health_and_safety_outlined),
-          activeIcon: Icon(Icons.health_and_safety_rounded),
-          label: 'Triaje',
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.science_outlined),
-          activeIcon: Icon(Icons.science_rounded),
-          label: 'Exámenes',
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.medical_services_outlined),
-          activeIcon: Icon(Icons.medical_services_rounded),
-          label: 'Médicos',
-        ),
-      ],
     );
   }
 }

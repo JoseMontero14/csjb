@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import '../models/chat_model.dart';
 import '../models/mensaje_model.dart';
-import '../services/cloud_functions_service.dart';
+import '../services/gemini_service.dart';
 import '../services/firestore_service.dart';
 
 enum ChatStatus { idle, loading, loaded, error }
@@ -9,12 +9,12 @@ enum ChatStatus { idle, loading, loaded, error }
 class ChatController extends ChangeNotifier {
   ChatController({
     FirestoreService? firestore,
-    CloudFunctionsService? gemini,
+    GeminiService? gemini,
   })  : _firestore = firestore ?? FirestoreService(),
-        _gemini = gemini ?? CloudFunctionsService();
+        _gemini = gemini ?? GeminiService();
 
   final FirestoreService _firestore;
-  final CloudFunctionsService _gemini;
+  final GeminiService _gemini;
 
   // ── Chat list ──────────────────────────────────────────────────────────────
   ChatStatus _statusLista = ChatStatus.idle;
@@ -40,6 +40,7 @@ class ChatController extends ChangeNotifier {
   // ── Active chat ────────────────────────────────────────────────────────────
   String? _chatId;
   String? _uid;
+  String? _contextoUsuario;
   List<MensajeModel> _mensajes = [];
   bool _enviando = false;
   bool _escribiendo = false; // indicador "IA está escribiendo"
@@ -51,9 +52,10 @@ class ChatController extends ChangeNotifier {
   bool get escribiendo => _escribiendo;
   String? get errorMensaje => _errorMensaje;
 
-  void iniciarChat(String uid, {String? chatId}) {
+  void iniciarChat(String uid, {String? chatId, String? contextoUsuario}) {
     _uid = uid;
     _chatId = chatId;
+    _contextoUsuario = contextoUsuario;
     _mensajes = [];
     _enviando = false;
     _escribiendo = false;
@@ -76,6 +78,18 @@ class ChatController extends ChangeNotifier {
     final textoLimpio = texto.trim();
     _errorMensaje = null;
 
+    // Agregar mensaje del usuario localmente de inmediato (antes de cualquier red)
+    final msgUsuario = MensajeModel(
+      id: '_local',
+      rol: 'user',
+      texto: textoLimpio,
+      timestamp: DateTime.now(),
+    );
+    _mensajes.add(msgUsuario);
+    _enviando = true;
+    _escribiendo = true;
+    notifyListeners();
+
     // Crear chat en Firestore si es nuevo
     if (_chatId == null) {
       try {
@@ -89,23 +103,14 @@ class ChatController extends ChangeNotifier {
         _chatId = await _firestore.crearChat(nuevoChat);
       } catch (e, st) {
         debugPrint('ChatController: error creando chat: $e\n$st');
+        _mensajes.removeLast();
+        _enviando = false;
+        _escribiendo = false;
         _errorMensaje = 'No se pudo iniciar la conversación.';
         notifyListeners();
         return;
       }
     }
-
-    // Agregar mensaje del usuario localmente
-    final msgUsuario = MensajeModel(
-      id: '_local',
-      rol: 'user',
-      texto: textoLimpio,
-      timestamp: DateTime.now(),
-    );
-    _mensajes.add(msgUsuario);
-    _enviando = true;
-    _escribiendo = true;
-    notifyListeners();
 
     try {
       // Persistir mensaje del usuario
@@ -122,8 +127,11 @@ class ChatController extends ChangeNotifier {
             _chatId!, titulo: _tituloDesde(textoLimpio));
       }
 
-      // Llamar a Gemini con el historial completo
-      final respuestaTexto = await _gemini.llamarGemini(_mensajes);
+      // Llamar a Gemini con el historial completo y contexto del paciente
+      final respuestaTexto = await _gemini.llamarGemini(
+        _mensajes,
+        contextoUsuario: _contextoUsuario,
+      );
 
       // Persistir respuesta IA
       final msgIA = MensajeModel(
@@ -138,7 +146,16 @@ class ChatController extends ChangeNotifier {
       await _firestore.actualizarChat(_chatId!, preview: respuestaTexto);
     } catch (e, st) {
       debugPrint('ChatController.enviarMensaje [${e.runtimeType}]: $e\n$st');
-      _errorMensaje = 'Error al conectar con el asistente. Intenta de nuevo.';
+      // Mostrar el fallo como burbuja de la IA — nunca banner de error.
+      // No se persiste en Firestore: es solo orientación de fallback.
+      _mensajes.add(MensajeModel(
+        id: '_fallback_${DateTime.now().millisecondsSinceEpoch}',
+        rol: 'assistant',
+        texto: 'En este momento no puedo darte una respuesta detallada. '
+            'Por favor intenta nuevamente en unos segundos, o si es urgente, '
+            'comunícate directamente con la Clínica San Juan Bautista.',
+        timestamp: DateTime.now(),
+      ));
     } finally {
       _enviando = false;
       _escribiendo = false;

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import '../models/usuario_model.dart';
@@ -7,9 +8,19 @@ enum AuthStatus { idle, loading, success, error }
 
 class AuthController extends ChangeNotifier {
   AuthController({AuthService? service})
-      : _service = service ?? AuthService();
+      : _service = service ?? AuthService() {
+    _authSub = FirebaseAuth.instance.authStateChanges().listen((firebaseUser) {
+      if (firebaseUser == null) {
+        _usuario = null;
+        _status = AuthStatus.idle;
+        _errorMessage = null;
+        notifyListeners();
+      }
+    });
+  }
 
   final AuthService _service;
+  late final StreamSubscription<User?> _authSub;
 
   AuthStatus _status = AuthStatus.idle;
   String? _errorMessage;
@@ -19,6 +30,12 @@ class AuthController extends ChangeNotifier {
   String? get errorMessage => _errorMessage;
   UsuarioModel? get usuario => _usuario;
   bool get isLoading => _status == AuthStatus.loading;
+
+  @override
+  void dispose() {
+    _authSub.cancel();
+    super.dispose();
+  }
 
   Future<bool> login({
     required String correo,

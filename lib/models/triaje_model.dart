@@ -11,6 +11,52 @@ extension IntensidadSintomasX on IntensidadSintomas {
       };
 }
 
+enum EstadoSeguimiento { sinProgramar, pendiente, respondido }
+
+enum RespuestaSeguimiento { mejore, sigoIgual, empeore }
+
+class SeguimientoTriaje {
+  const SeguimientoTriaje({
+    this.programado = false,
+    this.fechaHora,
+    this.estado = EstadoSeguimiento.sinProgramar,
+    this.respuesta,
+  });
+
+  final bool programado;
+  final DateTime? fechaHora;
+  final EstadoSeguimiento estado;
+  final RespuestaSeguimiento? respuesta;
+
+  Map<String, dynamic> toMap() => {
+        'programado': programado,
+        'fechaHora':
+            fechaHora != null ? Timestamp.fromDate(fechaHora!) : null,
+        'estado': estado.name,
+        'respuesta': respuesta?.name,
+      };
+
+  static SeguimientoTriaje fromMap(Map<String, dynamic> m) =>
+      SeguimientoTriaje(
+        programado: m['programado'] as bool? ?? false,
+        fechaHora: m['fechaHora'] != null
+            ? (m['fechaHora'] as Timestamp).toDate()
+            : null,
+        estado: EstadoSeguimiento.values.firstWhere(
+          (e) => e.name == m['estado'],
+          orElse: () => EstadoSeguimiento.sinProgramar,
+        ),
+        respuesta: m['respuesta'] != null
+            ? RespuestaSeguimiento.values.firstWhere(
+                (e) => e.name == m['respuesta'],
+                orElse: () => RespuestaSeguimiento.sigoIgual,
+              )
+            : null,
+      );
+
+  static SeguimientoTriaje sinProgramar() => const SeguimientoTriaje();
+}
+
 class TriajeModel {
   TriajeModel({
     this.id,
@@ -23,7 +69,8 @@ class TriajeModel {
     required this.fecha,
     this.especialidadSugerida,
     this.guardado = false,
-  });
+    SeguimientoTriaje? seguimiento,
+  }) : seguimiento = seguimiento ?? SeguimientoTriaje.sinProgramar();
 
   final String? id;
   final String uid;
@@ -35,8 +82,14 @@ class TriajeModel {
   final String? especialidadSugerida;
   final DateTime fecha;
   final bool guardado;
+  final SeguimientoTriaje seguimiento;
 
-  TriajeModel copyWith({String? id, bool? guardado}) => TriajeModel(
+  TriajeModel copyWith({
+    String? id,
+    bool? guardado,
+    SeguimientoTriaje? seguimiento,
+  }) =>
+      TriajeModel(
         id: id ?? this.id,
         uid: uid,
         sintomas: sintomas,
@@ -47,6 +100,7 @@ class TriajeModel {
         especialidadSugerida: especialidadSugerida,
         fecha: fecha,
         guardado: guardado ?? this.guardado,
+        seguimiento: seguimiento ?? this.seguimiento,
       );
 
   Map<String, dynamic> toFirestore() => {
@@ -60,6 +114,7 @@ class TriajeModel {
           'especialidadSugerida': especialidadSugerida,
         'fecha': Timestamp.fromDate(fecha),
         'guardado': true,
+        'seguimiento': seguimiento.toMap(),
       };
 
   static TriajeModel fromFirestore(DocumentSnapshot doc) {
@@ -81,6 +136,10 @@ class TriajeModel {
       especialidadSugerida: d['especialidadSugerida'] as String?,
       fecha: (d['fecha'] as Timestamp).toDate(),
       guardado: d['guardado'] as bool? ?? true,
+      seguimiento: d['seguimiento'] != null
+          ? SeguimientoTriaje.fromMap(
+              d['seguimiento'] as Map<String, dynamic>)
+          : null,
     );
   }
 }

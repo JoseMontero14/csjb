@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import '../../controllers/triaje_controller.dart';
 import '../../utils/routes.dart';
 import '../../utils/theme.dart';
@@ -60,6 +61,15 @@ class _TriajeSintomasViewState extends State<TriajeSintomasView> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // Ilustración médica
+                      Center(
+                        child: SvgPicture.asset(
+                          'assets/il_triaje_empty.svg',
+                          height: (MediaQuery.of(context).size.height * 0.18).clamp(90.0, 140.0),
+                          fit: BoxFit.contain,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.md),
                       Text(
                         '¿Qué síntomas tienes?',
                         style: textTheme.titleMedium,

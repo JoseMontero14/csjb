@@ -6,7 +6,9 @@ import '../../utils/theme.dart';
 import '../../widgets/app_button.dart';
 import 'triaje_widgets.dart';
 
-const _kUidPlaceholder = 'uid-placeholder';
+import 'package:firebase_auth/firebase_auth.dart';
+
+String get _uid => FirebaseAuth.instance.currentUser?.uid ?? '';
 
 class TriajeIntensidadView extends StatefulWidget {
   const TriajeIntensidadView({super.key});
@@ -30,7 +32,7 @@ class _TriajeIntensidadViewState extends State<TriajeIntensidadView> {
   }
 
   Future<void> _verResultado() async {
-    await _controller.generarResultado(_kUidPlaceholder);
+    await _controller.generarResultado(_uid);
     if (!mounted) return;
     if (_controller.listo) {
       await AppRoutes.push(

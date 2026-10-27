@@ -20,11 +20,14 @@ class MedicoController extends ChangeNotifier {
   List<MedicoModel> get medicosFiltrados => _especialidadSeleccionada == null
       ? _medicos
       : _medicos
-          .where((m) => m.especialidad == _especialidadSeleccionada)
+          .where((m) =>
+              m.especialidad.toUpperCase() ==
+              _especialidadSeleccionada!.toUpperCase())
           .toList();
 
+  /// Lista de especialidades únicas en formato display (title case) para la UI.
   List<String> get especialidades {
-    final esp = _medicos.map((m) => m.especialidad).toSet().toList();
+    final esp = _medicos.map((m) => m.especialidadDisplay).toSet().toList();
     esp.sort();
     return esp;
   }

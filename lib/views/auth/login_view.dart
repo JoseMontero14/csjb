@@ -34,7 +34,12 @@ class _LoginViewState extends State<LoginView> {
     );
     if (!mounted) return;
     if (ok) {
-      AppRoutes.pushAndRemoveAll(context, AppRoutes.dashboard);
+      final tienePreferencias =
+          _controller.usuario?.preferenciasSalud != null;
+      AppRoutes.pushAndRemoveAll(
+        context,
+        tienePreferencias ? AppRoutes.dashboard : AppRoutes.onboarding,
+      );
     } else {
       _showError(_controller.errorMessage!);
     }
@@ -69,24 +74,29 @@ class _LoginViewState extends State<LoginView> {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
 
+    final screenHeight = MediaQuery.of(context).size.height;
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
+
     return Scaffold(
       body: SafeArea(
         child: ListenableBuilder(
           listenable: _controller,
           builder: (context, _) {
             return SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.lg,
-                vertical: AppSpacing.xl,
+              padding: EdgeInsets.fromLTRB(
+                AppSpacing.lg,
+                AppSpacing.lg,
+                AppSpacing.lg,
+                bottomPadding + AppSpacing.lg,
               ),
               child: Form(
                 key: _formKey,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    const SizedBox(height: AppSpacing.xl),
+                    SizedBox(height: screenHeight * 0.04),
                     _Logo(),
-                    const SizedBox(height: AppSpacing.xl),
+                    SizedBox(height: screenHeight * 0.04),
                     Text(
                       'Bienvenido',
                       style: textTheme.headlineMedium,
@@ -140,7 +150,7 @@ class _LoginViewState extends State<LoginView> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: AppSpacing.lg),
+                    SizedBox(height: screenHeight * 0.03),
                     AppButton(
                       label: 'Ingresar',
                       onPressed: _controller.isLoading ? null : _login,
@@ -181,25 +191,52 @@ class _LoginViewState extends State<LoginView> {
 class _Logo extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 88,
-      height: 88,
-      decoration: BoxDecoration(
-        color: AppColors.primary,
-        borderRadius: AppRadius.xlBr,
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withAlpha(60),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
+    final logoSize = (MediaQuery.of(context).size.height * 0.13).clamp(72.0, 100.0);
+    return Column(
+      children: [
+        Container(
+          width: logoSize,
+          height: logoSize,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: Colors.white,
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.primary.withAlpha(40),
+                blurRadius: 24,
+                offset: const Offset(0, 8),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: const Icon(
-        Icons.local_hospital_rounded,
-        color: AppColors.onPrimary,
-        size: 44,
-      ),
+          child: ClipOval(
+            child: Image.asset(
+              'assets/logo_csjb.png',
+              width: logoSize,
+              height: logoSize,
+              fit: BoxFit.contain,
+            ),
+          ),
+        ),
+        const SizedBox(height: 14),
+        Text(
+          'Clínica San Juan Bautista',
+          style: TextStyle(
+            color: AppColors.primary,
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.2,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          'Red San Pablo',
+          style: TextStyle(
+            color: AppColors.textSecondary,
+            fontSize: 12,
+            fontWeight: FontWeight.w400,
+          ),
+        ),
+      ],
     );
   }
 }

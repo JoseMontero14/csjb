@@ -1,18 +1,21 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:timezone/timezone.dart' as tz;
 import '../models/triaje_model.dart';
-import '../services/cloud_functions_service.dart';
+import '../services/gemini_service.dart';
+import '../utils/theme.dart' show UrgencyLevel;
 
 enum TriajeStatus { idle, generando, listo, error, guardando, guardado }
 
 class TriajeController extends ChangeNotifier {
   TriajeController({
-    CloudFunctionsService? gemini,
+    GeminiService? gemini,
     FirebaseFirestore? db,
-  })  : _gemini = gemini ?? CloudFunctionsService(),
+  })  : _gemini = gemini ?? GeminiService(),
         _db = db ?? FirebaseFirestore.instance;
 
-  final CloudFunctionsService _gemini;
+  final GeminiService _gemini;
   final FirebaseFirestore _db;
 
   // ── Estado del flujo de 3 pasos (en memoria, sin tocar Firestore) ──────────
@@ -120,8 +123,22 @@ class TriajeController extends ChangeNotifier {
       _status = TriajeStatus.listo;
     } catch (e, st) {
       debugPrint('TriajeController.generarResultado [${e.runtimeType}]: $e\n$st');
-      _errorMensaje = e.toString().replaceFirst('Exception: ', '');
-      _status = TriajeStatus.error;
+      // Fallback seguro: resultado neutro para que el usuario no quede sin orientación.
+      _resultado = TriajeModel(
+        uid: uid,
+        sintomas: todosSintomas,
+        intensidad: _intensidad!,
+        duracionSintomas: _duracion!,
+        nivelUrgencia: UrgencyLevel.medium,
+        recomendacion:
+            'No pudimos procesar tu triaje en este momento. '
+            'Si tus síntomas son intensos o te preocupan, te recomendamos '
+            'acudir directamente a la clínica o comunicarte con emergencias (SAMU 106).',
+        especialidadSugerida: 'Medicina Interna',
+        fecha: DateTime.now(),
+        guardado: false,
+      );
+      _status = TriajeStatus.listo;
     }
 
     notifyListeners();
@@ -170,6 +187,61 @@ class TriajeController extends ChangeNotifier {
 
     _cargandoHistorial = false;
     notifyListeners();
+  }
+
+  // ── Seguimiento post-triaje ────────────────────────────────────────────────
+
+  static const int _notifIdBase = 2000;
+
+  Future<void> guardarSeguimiento({
+    required DateTime fechaHora,
+    required FlutterLocalNotificationsPlugin notificaciones,
+  }) async {
+    final r = _resultado;
+    if (r == null || r.id == null) return;
+
+    final seguimiento = SeguimientoTriaje(
+      programado: true,
+      fechaHora: fechaHora,
+      estado: EstadoSeguimiento.pendiente,
+    );
+
+    try {
+      await _db.collection('triajes').doc(r.id).update({
+        'seguimiento': seguimiento.toMap(),
+      });
+      _resultado = r.copyWith(seguimiento: seguimiento);
+
+      final notifId = _notifIdBase + r.id.hashCode.abs() % 10000;
+      const androidDetails = AndroidNotificationDetails(
+        'triaje_seguimiento',
+        'Seguimiento de triaje',
+        channelDescription: 'Recordatorios de seguimiento post-triaje',
+        importance: Importance.high,
+        priority: Priority.high,
+      );
+      const iosDetails = DarwinNotificationDetails();
+      const details = NotificationDetails(
+        android: androidDetails,
+        iOS: iosDetails,
+      );
+
+      await notificaciones.zonedSchedule(
+        notifId,
+        '¿Cómo te sientes hoy?',
+        'Cuéntanos cómo evolucionaron tus síntomas desde tu último triaje.',
+        tz.TZDateTime.from(fechaHora, tz.local),
+        details,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        payload: 'seguimiento:${r.id}',
+      );
+
+      notifyListeners();
+    } catch (e, st) {
+      debugPrint('TriajeController.guardarSeguimiento: $e\n$st');
+    }
   }
 
   // ── Reiniciar flujo ────────────────────────────────────────────────────────

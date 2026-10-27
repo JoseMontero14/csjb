@@ -72,7 +72,7 @@ class _RegistroViewState extends State<RegistroView> {
     );
     if (!mounted) return;
     if (ok) {
-      AppRoutes.pushAndRemoveAll(context, AppRoutes.dashboard);
+      AppRoutes.pushAndRemoveAll(context, AppRoutes.onboarding);
     } else {
       _showError(_controller.errorMessage!);
     }
@@ -100,10 +100,13 @@ class _RegistroViewState extends State<RegistroView> {
         child: ListenableBuilder(
           listenable: _controller,
           builder: (context, _) {
+            final bottomPadding = MediaQuery.of(context).padding.bottom;
             return SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.lg,
-                vertical: AppSpacing.md,
+              padding: EdgeInsets.fromLTRB(
+                AppSpacing.lg,
+                AppSpacing.md,
+                AppSpacing.lg,
+                bottomPadding + AppSpacing.md,
               ),
               child: Form(
                 key: _formKey,

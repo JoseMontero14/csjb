@@ -12,6 +12,7 @@ class DashboardData {
     required this.proximaToma,
     this.ultimoTriajeNivel,
     this.ultimoTriajeFecha,
+    this.nombre = '',
   });
 
   final int bienestarPct;
@@ -20,6 +21,7 @@ class DashboardData {
   final TomaConRecordatorio? proximaToma;
   final UrgencyLevel? ultimoTriajeNivel;
   final DateTime? ultimoTriajeFecha;
+  final String nombre;
 
   bool get sinRegistros => totalHoy == 0;
   bool get tieneTriaje => ultimoTriajeNivel != null;
@@ -67,6 +69,9 @@ class DashboardController extends ChangeNotifier {
             .compareTo(_minutosDesdeAhora(b.toma.hora, now)));
 
       final (:nivelTriaje, :fechaTriaje) = await _ultimoTriaje(uid);
+      final nombre = await _fetchNombre(uid);
+
+      debugPrint('[Dashboard] uid=$uid nombre=$nombre');
 
       _data = DashboardData(
         bienestarPct: pct,
@@ -75,6 +80,7 @@ class DashboardController extends ChangeNotifier {
         proximaToma: pendientes.isEmpty ? null : pendientes.first,
         ultimoTriajeNivel: nivelTriaje,
         ultimoTriajeFecha: fechaTriaje,
+        nombre: nombre,
       );
       _status = DashboardStatus.loaded;
     } catch (e, st) {
@@ -108,6 +114,17 @@ class DashboardController extends ChangeNotifier {
     } catch (e, st) {
       debugPrint('DashboardController._ultimoTriaje: $e\n$st');
       return (nivelTriaje: null, fechaTriaje: null);
+    }
+  }
+
+  Future<String> _fetchNombre(String uid) async {
+    try {
+      final doc = await _db.collection('usuarios').doc(uid).get();
+      if (!doc.exists) return '';
+      return (doc.data() as Map<String, dynamic>)['nombre'] as String? ?? '';
+    } catch (e) {
+      debugPrint('DashboardController._fetchNombre: $e');
+      return '';
     }
   }
 

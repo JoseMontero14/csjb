@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:intl/intl.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../controllers/chat_controller.dart';
 import '../../utils/routes.dart';
 import '../../utils/theme.dart';
 import '../../widgets/app_button.dart';
 
-const _kUidPlaceholder = 'uid-placeholder';
+String get _uid => FirebaseAuth.instance.currentUser?.uid ?? '';
 
 class ChatListaView extends StatefulWidget {
   const ChatListaView({super.key});
@@ -20,7 +22,7 @@ class _ChatListaViewState extends State<ChatListaView> {
   @override
   void initState() {
     super.initState();
-    _controller.cargarChats(_kUidPlaceholder);
+    _controller.cargarChats(_uid);
   }
 
   @override
@@ -31,12 +33,12 @@ class _ChatListaViewState extends State<ChatListaView> {
 
   Future<void> _nuevaConsulta() async {
     await AppRoutes.push(context, AppRoutes.chatDetalle);
-    if (mounted) _controller.cargarChats(_kUidPlaceholder);
+    if (mounted) _controller.cargarChats(_uid);
   }
 
   Future<void> _abrirChat(String chatId) async {
     await AppRoutes.push(context, AppRoutes.chatDetalle, args: chatId);
-    if (mounted) _controller.cargarChats(_kUidPlaceholder);
+    if (mounted) _controller.cargarChats(_uid);
   }
 
   Future<bool?> _confirmarEliminar() => showDialog<bool>(
@@ -52,8 +54,8 @@ class _ChatListaViewState extends State<ChatListaView> {
             ),
             TextButton(
               onPressed: () => Navigator.pop(ctx, true),
-              style:
-                  TextButton.styleFrom(foregroundColor: AppColors.urgencyHigh),
+              style: TextButton.styleFrom(
+                  foregroundColor: AppColors.urgencyHigh),
               child: const Text('Eliminar'),
             ),
           ],
@@ -66,7 +68,46 @@ class _ChatListaViewState extends State<ChatListaView> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Chat IA')),
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        toolbarHeight: 64,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Chat IA'),
+            Text(
+              'Orientación médica 24/7',
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: AppColors.primary.withAlpha(160),
+                    fontWeight: FontWeight.w500,
+                  ),
+            ),
+          ],
+        ),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: AppSpacing.sm),
+            child: ClipOval(
+              child: Image.asset('assets/logo_csjb.png',
+                  width: 28, height: 28, fit: BoxFit.contain),
+            ),
+          ),
+        ],
+      ),
+      floatingActionButton: ListenableBuilder(
+        listenable: _controller,
+        builder: (context, _) {
+          if (_controller.chats.isEmpty) return const SizedBox.shrink();
+          return FloatingActionButton.extended(
+            onPressed: _nuevaConsulta,
+            backgroundColor: AppColors.primary,
+            foregroundColor: AppColors.onPrimary,
+            icon: const Icon(Icons.add_rounded),
+            label: const Text('Nueva consulta'),
+          );
+        },
+      ),
       body: ListenableBuilder(
         listenable: _controller,
         builder: (context, _) {
@@ -80,31 +121,50 @@ class _ChatListaViewState extends State<ChatListaView> {
           }
           return RefreshIndicator(
             color: AppColors.primary,
-            onRefresh: () => _controller.cargarChats(_kUidPlaceholder),
-            child: ListView.separated(
-              padding: const EdgeInsets.symmetric(
-                  vertical: AppSpacing.sm, horizontal: AppSpacing.md),
-              itemCount: _controller.chats.length,
-              separatorBuilder: (context2, i2) => const Divider(height: 1),
+            onRefresh: () => _controller.cargarChats(_uid),
+            child: ListView.builder(
+              padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.md, AppSpacing.sm, AppSpacing.md, 100),
+              itemCount: _controller.chats.length + 2,
               itemBuilder: (context, i) {
-                final chat = _controller.chats[i];
-                return Dismissible(
-                  key: ValueKey(chat.id),
-                  direction: DismissDirection.endToStart,
-                  confirmDismiss: (_) => _confirmarEliminar(),
-                  onDismissed: (_) => _eliminarChat(chat.id),
-                  background: Container(
-                    alignment: Alignment.centerRight,
-                    padding: const EdgeInsets.only(right: AppSpacing.lg),
-                    color: AppColors.urgencyHighBg,
-                    child: const Icon(Icons.delete_outline_rounded,
-                        color: AppColors.urgencyHigh),
-                  ),
-                  child: _ChatTile(
-                    titulo: chat.titulo,
-                    preview: chat.preview,
-                    fecha: chat.creadoEn,
-                    onTap: () => _abrirChat(chat.id),
+                if (i == 0) return _HeaderAsistente(onNuevaConsulta: _nuevaConsulta);
+                if (i == 1) {
+                  return Padding(
+                    padding: const EdgeInsets.only(
+                        top: AppSpacing.md, bottom: AppSpacing.sm),
+                    child: Text(
+                      'Consultas recientes',
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                            color: AppColors.textPrimary,
+                            fontWeight: FontWeight.w700,
+                          ),
+                    ),
+                  );
+                }
+                final chat = _controller.chats[i - 2];
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                  child: Dismissible(
+                    key: ValueKey(chat.id),
+                    direction: DismissDirection.endToStart,
+                    confirmDismiss: (_) => _confirmarEliminar(),
+                    onDismissed: (_) => _eliminarChat(chat.id),
+                    background: Container(
+                      alignment: Alignment.centerRight,
+                      padding: const EdgeInsets.only(right: AppSpacing.lg),
+                      decoration: BoxDecoration(
+                        color: AppColors.urgencyHighBg,
+                        borderRadius: AppRadius.lgBr,
+                      ),
+                      child: const Icon(Icons.delete_outline_rounded,
+                          color: AppColors.urgencyHigh),
+                    ),
+                    child: _ChatCard(
+                      titulo: chat.titulo,
+                      preview: chat.preview,
+                      fecha: chat.creadoEn,
+                      onTap: () => _abrirChat(chat.id),
+                    ),
                   ),
                 );
               },
@@ -112,21 +172,156 @@ class _ChatListaViewState extends State<ChatListaView> {
           );
         },
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _nuevaConsulta,
-        backgroundColor: AppColors.primary,
-        foregroundColor: AppColors.onPrimary,
-        icon: const Icon(Icons.add_rounded),
-        label: const Text('Nueva consulta'),
+    );
+  }
+}
+
+// ── Header asistente ──────────────────────────────────────────────────────────
+
+class _HeaderAsistente extends StatelessWidget {
+  const _HeaderAsistente({required this.onNuevaConsulta});
+  final VoidCallback onNuevaConsulta;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: AppSpacing.md, top: AppSpacing.xs),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topRight,
+          end: Alignment.bottomLeft,
+          colors: [Color(0xFF5B2D8E), Color(0xFF7B3FB8)],
+        ),
+        borderRadius: AppRadius.xlBr,
+      ),
+      child: Stack(
+        clipBehavior: Clip.hardEdge,
+        children: [
+          // Círculo decorativo
+          Positioned(
+            right: -20,
+            top: -20,
+            child: Container(
+              width: 100,
+              height: 100,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withAlpha(12),
+              ),
+            ),
+          ),
+          // Ilustración SVG a la derecha
+          Positioned(
+            right: 0,
+            bottom: 0,
+            child: Opacity(
+              opacity: 0.25,
+              child: SvgPicture.asset(
+                'assets/il_chat_empty.svg',
+                height: 110,
+                fit: BoxFit.contain,
+              ),
+            ),
+          ),
+          // Contenido
+          Padding(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Badge "En línea 24/7"
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.sm, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withAlpha(25),
+                    borderRadius: AppRadius.fullBr,
+                    border: Border.all(color: Colors.white.withAlpha(50)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 6,
+                        height: 6,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFF4CAF50),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        'En línea 24/7',
+                        style: textTheme.labelSmall?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  'Asistente médico IA',
+                  style: textTheme.titleMedium?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                    height: 1.2,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Orientación informativa,\nno reemplaza al médico.',
+                  style: textTheme.labelSmall?.copyWith(
+                    color: Colors.white.withAlpha(180),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                // Botón Consultar
+                SizedBox(
+                  height: 34,
+                  child: ElevatedButton(
+                    onPressed: onNuevaConsulta,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: AppColors.primary,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.md),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: AppRadius.fullBr),
+                      textStyle: textTheme.labelMedium
+                          ?.copyWith(fontWeight: FontWeight.w700),
+                    ),
+                    child: const Text('Consultar'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
 }
 
-// ── Chat tile ─────────────────────────────────────────────────────────────────
+// Color de avatar para chat card según hash del título
+({Color bg, Color icon}) _paletaChat(String titulo) {
+  const opciones = [
+    (bg: Color(0xFFEDE5FF), icon: AppColors.primary),
+    (bg: Color(0xFFD1EFEC), icon: Color(0xFF00697A)),
+    (bg: Color(0xFFE3F2FD), icon: Color(0xFF1976D2)),
+    (bg: Color(0xFFFFF3E0), icon: Color(0xFFF59E0B)),
+  ];
+  return opciones[titulo.hashCode.abs() % opciones.length];
+}
 
-class _ChatTile extends StatelessWidget {
-  const _ChatTile({
+// ── Chat card ─────────────────────────────────────────────────────────────────
+
+class _ChatCard extends StatelessWidget {
+  const _ChatCard({
     required this.titulo,
     required this.fecha,
     required this.onTap,
@@ -149,37 +344,83 @@ class _ChatTile extends StatelessWidget {
         ? DateFormat('HH:mm', 'es').format(fecha)
         : DateFormat('d MMM', 'es').format(fecha);
 
-    return ListTile(
-      contentPadding:
-          const EdgeInsets.symmetric(vertical: AppSpacing.xs),
-      leading: Container(
-        width: 44,
-        height: 44,
-        decoration: BoxDecoration(
-          color: AppColors.surfaceVariant,
-          borderRadius: AppRadius.mdBr,
+    return Material(
+      color: AppColors.surface,
+      borderRadius: AppRadius.lgBr,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: AppRadius.lgBr,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.md, vertical: AppSpacing.sm + 2),
+          child: Row(
+            children: [
+              // Avatar asistente IA con color variado por título
+              Builder(builder: (ctx) {
+                final paleta = _paletaChat(titulo);
+                return Container(
+                  width: 46,
+                  height: 46,
+                  decoration: BoxDecoration(
+                    color: paleta.bg,
+                    shape: BoxShape.circle,
+                  ),
+                  clipBehavior: Clip.hardEdge,
+                  child: Padding(
+                    padding: const EdgeInsets.all(6),
+                    child: SvgPicture.asset(
+                      'assets/il_asistente_avatar.svg',
+                      fit: BoxFit.contain,
+                      colorFilter: ColorFilter.mode(paleta.icon, BlendMode.srcIn),
+                    ),
+                  ),
+                );
+              }),
+              const SizedBox(width: AppSpacing.md),
+              // Texto
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            titulo,
+                            style: textTheme.titleSmall
+                                ?.copyWith(fontWeight: FontWeight.w600),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.xs),
+                        Text(
+                          fechaStr,
+                          style: textTheme.labelSmall
+                              ?.copyWith(color: AppColors.textDisabled),
+                        ),
+                      ],
+                    ),
+                    if (preview != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        preview!,
+                        style: textTheme.bodySmall
+                            ?.copyWith(color: AppColors.textSecondary),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(width: AppSpacing.xs),
+              const Icon(Icons.chevron_right_rounded,
+                  color: AppColors.textDisabled, size: 18),
+            ],
+          ),
         ),
-        child: const Icon(Icons.chat_bubble_outline_rounded,
-            color: AppColors.primary, size: 22),
       ),
-      title: Text(
-        titulo,
-        style: textTheme.titleSmall,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
-      subtitle: preview != null
-          ? Text(
-              preview!,
-              style: textTheme.bodySmall,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            )
-          : null,
-      trailing: Text(fechaStr,
-          style: textTheme.labelSmall
-              ?.copyWith(color: AppColors.textDisabled)),
-      onTap: onTap,
     );
   }
 }
@@ -200,18 +441,21 @@ class _EstadoVacio extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.chat_bubble_outline_rounded,
-                size: 72, color: AppColors.surfaceVariant),
+            SvgPicture.asset(
+              'assets/il_chat_empty.svg',
+              height: 200,
+              fit: BoxFit.contain,
+            ),
             const SizedBox(height: AppSpacing.md),
             Text(
-              'Sin consultas aún',
-              style: textTheme.titleMedium,
+              'Aún no tienes consultas',
+              style: textTheme.titleMedium
+                  ?.copyWith(fontWeight: FontWeight.w700),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: AppSpacing.sm),
+            const SizedBox(height: AppSpacing.xs),
             Text(
-              'Escríbele al asistente tus dudas sobre síntomas, '
-              'medicamentos o salud en general.',
+              'El asistente de la Clínica San Juan Bautista\npuede orientarte sobre síntomas y salud.',
               style: textTheme.bodySmall
                   ?.copyWith(color: AppColors.textSecondary),
               textAlign: TextAlign.center,

@@ -43,8 +43,18 @@ class TomaModel {
 
 // Agrupa toma con su recordatorio para mostrar en la lista de "Hoy"
 class TomaConRecordatorio {
-  const TomaConRecordatorio({required this.toma, required this.medicamento, required this.dosis});
+  const TomaConRecordatorio({
+    required this.toma,
+    required this.medicamento,
+    required this.presentacion,
+    required this.dosis,
+  });
   final TomaModel toma;
   final String medicamento;
+  final String presentacion;
   final String dosis;
+
+  String get nombreCompleto => presentacion.isEmpty
+      ? medicamento
+      : '$medicamento $presentacion';
 }

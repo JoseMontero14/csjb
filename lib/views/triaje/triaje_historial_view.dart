@@ -6,7 +6,9 @@ import '../../utils/routes.dart';
 import '../../utils/theme.dart';
 import '../../widgets/urgency_badge.dart';
 
-const _kUidPlaceholder = 'uid-placeholder';
+import 'package:firebase_auth/firebase_auth.dart';
+
+String get _uid => FirebaseAuth.instance.currentUser?.uid ?? '';
 
 class TriajeHistorialView extends StatefulWidget {
   const TriajeHistorialView({super.key});
@@ -21,7 +23,7 @@ class _TriajeHistorialViewState extends State<TriajeHistorialView> {
   @override
   void initState() {
     super.initState();
-    _controller.cargarHistorial(_kUidPlaceholder);
+    _controller.cargarHistorial(_uid);
   }
 
   @override
@@ -50,7 +52,7 @@ class _TriajeHistorialViewState extends State<TriajeHistorialView> {
           }
           return RefreshIndicator(
             color: AppColors.primary,
-            onRefresh: () => _controller.cargarHistorial(_kUidPlaceholder),
+            onRefresh: () => _controller.cargarHistorial(_uid),
             child: ListView.separated(
               padding: const EdgeInsets.symmetric(
                   vertical: AppSpacing.sm, horizontal: AppSpacing.md),

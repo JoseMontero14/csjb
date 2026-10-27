@@ -3,6 +3,16 @@ import '../../controllers/examen_controller.dart';
 import '../../models/examen_model.dart';
 import '../../utils/theme.dart';
 
+// Paleta por categoría de examen
+({Color bg, Color icon}) _paletaCategoria(String cat) => switch (cat) {
+      'Cardiología' => (bg: const Color(0xFFFFEBEE), icon: const Color(0xFFE53935)),
+      'Sangre' => (bg: const Color(0xFFFFEBEE), icon: const Color(0xFFE53935)),
+      'Orina' => (bg: const Color(0xFFFFF8E1), icon: const Color(0xFFF59E0B)),
+      'Imágenes' => (bg: const Color(0xFFE3F2FD), icon: const Color(0xFF1976D2)),
+      'Preventivo' => (bg: const Color(0xFFD1EFEC), icon: const Color(0xFF00697A)),
+      _ => (bg: const Color(0xFFEDE5FF), icon: AppColors.primary),
+    };
+
 class ExamenesView extends StatefulWidget {
   const ExamenesView({super.key});
 
@@ -31,6 +41,7 @@ class _ExamenesViewState extends State<ExamenesView> {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
+      showDragHandle: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
       ),
@@ -41,53 +52,66 @@ class _ExamenesViewState extends State<ExamenesView> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Catálogo de exámenes')),
-      body: ListenableBuilder(
-        listenable: _controller,
-        builder: (context, _) {
-          if (_controller.cargando) {
-            return const Center(
-              child: CircularProgressIndicator(color: AppColors.primary),
-            );
-          }
-          if (_controller.error != null) {
-            return _EstadoError(
-              mensaje: _controller.error!,
-              onReintentar: _controller.cargar,
-            );
-          }
+      appBar: AppBar(
+        title: const Text('Catálogo de exámenes'),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: AppSpacing.sm),
+            child: ClipOval(
+              child: Image.asset('assets/logo_csjb.png',
+                  width: 28, height: 28, fit: BoxFit.contain),
+            ),
+          ),
+        ],
+      ),
+      body: SafeArea(
+        bottom: true,
+        child: ListenableBuilder(
+          listenable: _controller,
+          builder: (context, _) {
+            if (_controller.cargando) {
+              return const Center(
+                child: CircularProgressIndicator(color: AppColors.primary),
+              );
+            }
+            if (_controller.error != null) {
+              return _EstadoError(
+                mensaje: _controller.error!,
+                onReintentar: _controller.cargar,
+              );
+            }
 
-          // Lista vacía: no hay datos en Firestore todavía
-          if (_controller.examenes.isEmpty) {
-            return _EstadoVacioSinDatos(
-              onCargarEjemplos: () async {
-                await _controller.cargarDatosEjemplo();
-              },
-            );
-          }
+            if (_controller.examenes.isEmpty) {
+              return _EstadoVacioSinDatos(
+                onCargarEjemplos: () async {
+                  await _controller.cargarDatosEjemplo();
+                },
+              );
+            }
 
-          return Column(
-            children: [
-              _BarraBusqueda(
-                controller: _searchController,
-                onChanged: _controller.setBusqueda,
-              ),
-              _ChipsCategorias(
-                categorias: _controller.categorias,
-                seleccionada: _controller.categoriaSeleccionada,
-                onSeleccionar: _controller.setCategoria,
-              ),
-              Expanded(
-                child: _controller.examenesFiltrados.isEmpty
-                    ? const _EstadoVacioFiltro()
-                    : _ListaExamenes(
-                        examenes: _controller.examenesFiltrados,
-                        onTap: _abrirDetalle,
-                      ),
-              ),
-            ],
-          );
-        },
+            return Column(
+              children: [
+                _BarraBusqueda(
+                  controller: _searchController,
+                  onChanged: _controller.setBusqueda,
+                ),
+                _ChipsCategorias(
+                  categorias: _controller.categorias,
+                  seleccionada: _controller.categoriaSeleccionada,
+                  onSeleccionar: _controller.setCategoria,
+                ),
+                Expanded(
+                  child: _controller.examenesFiltrados.isEmpty
+                      ? const _EstadoVacioFiltro()
+                      : _ListaExamenes(
+                          examenes: _controller.examenesFiltrados,
+                          onTap: _abrirDetalle,
+                        ),
+                ),
+              ],
+            );
+          },
+        ),
       ),
     );
   }
@@ -131,7 +155,15 @@ class _BarraBusqueda extends StatelessWidget {
           contentPadding:
               const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 10),
           border: OutlineInputBorder(
-            borderSide: BorderSide.none,
+            borderSide: const BorderSide(color: AppColors.primaryBorder),
+            borderRadius: AppRadius.xlBr,
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderSide: const BorderSide(color: AppColors.primaryBorder),
+            borderRadius: AppRadius.xlBr,
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
             borderRadius: AppRadius.xlBr,
           ),
         ),
@@ -176,16 +208,14 @@ class _ChipsCategorias extends StatelessWidget {
             label: Text(label),
             selected: activo,
             onSelected: (_) => onSeleccionar(cat),
-            selectedColor: AppColors.urgencyMediumBg,
-            checkmarkColor: AppColors.accent,
+            selectedColor: AppColors.primary.withAlpha(20),
+            checkmarkColor: AppColors.primary,
             side: BorderSide(
-              color: activo ? AppColors.accent : AppColors.surfaceVariant,
+              color: activo ? AppColors.primary : AppColors.surfaceVariant,
             ),
             labelStyle: textTheme.labelMedium?.copyWith(
-              color:
-                  activo ? AppColors.accentDark : AppColors.textSecondary,
-              fontWeight:
-                  activo ? FontWeight.w600 : FontWeight.normal,
+              color: activo ? AppColors.primary : AppColors.textSecondary,
+              fontWeight: activo ? FontWeight.w600 : FontWeight.normal,
             ),
             backgroundColor: AppColors.surface,
             shape: RoundedRectangleBorder(borderRadius: AppRadius.fullBr),
@@ -217,7 +247,8 @@ class _ListaExamenes extends StatelessWidget {
       padding: const EdgeInsets.symmetric(
           horizontal: AppSpacing.md, vertical: AppSpacing.sm),
       itemCount: examenes.length,
-      separatorBuilder: (context2, i2) => const Divider(height: 1),
+      separatorBuilder: (context2, i2) =>
+          const SizedBox(height: AppSpacing.xs),
       itemBuilder: (context, i) =>
           _ExamenTile(examen: examenes[i], onTap: () => onTap(examenes[i])),
     );
@@ -230,57 +261,6 @@ class _ExamenTile extends StatelessWidget {
   final ExamenModel examen;
   final VoidCallback onTap;
 
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
-      leading: Container(
-        width: 44,
-        height: 44,
-        decoration: BoxDecoration(
-          color: AppColors.surfaceVariant,
-          borderRadius: AppRadius.mdBr,
-        ),
-        child: Icon(
-          _iconoCategoria(examen.categoria),
-          color: AppColors.primary,
-          size: 22,
-        ),
-      ),
-      title: Text(
-        examen.nombre,
-        style: textTheme.titleSmall,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
-      subtitle: Row(
-        children: [
-          Text(
-            examen.categoria,
-            style: textTheme.bodySmall
-                ?.copyWith(color: AppColors.textSecondary),
-          ),
-          if (examen.requierePreparacion) ...[
-            const SizedBox(width: AppSpacing.xs),
-            const Icon(Icons.schedule_rounded,
-                size: 12, color: AppColors.accent),
-            const SizedBox(width: 2),
-            Text(
-              'Requiere preparación',
-              style: textTheme.labelSmall
-                  ?.copyWith(color: AppColors.accent),
-            ),
-          ],
-        ],
-      ),
-      trailing: const Icon(Icons.chevron_right_rounded,
-          color: AppColors.textDisabled),
-      onTap: onTap,
-    );
-  }
-
   IconData _iconoCategoria(String cat) => switch (cat) {
         'Sangre' => Icons.water_drop_rounded,
         'Orina' => Icons.science_rounded,
@@ -289,6 +269,105 @@ class _ExamenTile extends StatelessWidget {
         'Preventivo' => Icons.shield_rounded,
         _ => Icons.biotech_rounded,
       };
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final paleta = _paletaCategoria(examen.categoria);
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: AppColors.cardBorder),
+        ),
+        child: Row(
+          children: [
+            // Ícono en caja cuadrada
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: paleta.bg,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(_iconoCategoria(examen.categoria),
+                  color: paleta.icon, size: 22),
+            ),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    examen.nombre,
+                    style: textTheme.titleSmall,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      // Categoría pill
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: paleta.bg,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          examen.categoria,
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: paleta.icon,
+                          ),
+                        ),
+                      ),
+                      if (examen.requierePreparacion) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppColors.catYellowBg,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Text(
+                            'Preparación',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.catYellowText,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            // Flecha en caja
+            Container(
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(
+                color: AppColors.surfaceVariant,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.chevron_right_rounded,
+                  size: 16, color: AppColors.primary),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 // ── Bottom sheet de detalle ───────────────────────────────────────────────────
@@ -308,18 +387,6 @@ class _ExamenBottomSheet extends StatelessWidget {
       expand: false,
       builder: (context, scroll) => Column(
         children: [
-          // Handle
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-            child: Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: AppColors.surfaceVariant,
-                borderRadius: AppRadius.fullBr,
-              ),
-            ),
-          ),
           Expanded(
             child: SingleChildScrollView(
               controller: scroll,
@@ -368,17 +435,19 @@ class _CategoriaChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final paleta = _paletaCategoria(categoria);
     return Container(
       padding: const EdgeInsets.symmetric(
           horizontal: AppSpacing.sm, vertical: 3),
       decoration: BoxDecoration(
-        color: AppColors.surfaceVariant,
+        color: paleta.bg,
         borderRadius: AppRadius.fullBr,
       ),
       child: Text(
         categoria,
         style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: AppColors.textSecondary,
+              color: paleta.icon,
+              fontWeight: FontWeight.w600,
             ),
       ),
     );
@@ -501,8 +570,16 @@ class _EstadoVacioSinDatos extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.biotech_rounded,
-                size: 72, color: AppColors.surfaceVariant),
+            Container(
+              width: 88,
+              height: 88,
+              decoration: const BoxDecoration(
+                color: Color(0xFFEDE5FF),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.biotech_rounded,
+                  size: 40, color: AppColors.primary),
+            ),
             const SizedBox(height: AppSpacing.md),
             Text(
               'Sin exámenes cargados',

@@ -1,0 +1,77 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function estaAutenticado() {
+      return request.auth != null;
+    }
+
+    function esDueno(userId) {
+      return estaAutenticado() && request.auth.uid == userId;
+    }
+
+    // ── Usuarios ────────────────────────────────────────────────────────────
+    // Cada usuario solo puede leer y escribir su propio documento.
+    match /usuarios/{userId} {
+      allow read, write: if esDueno(userId);
+    }
+
+    // ── Triajes ─────────────────────────────────────────────────────────────
+    // Campo de propiedad: "uid"
+    match /triajes/{triajeId} {
+      allow read: if estaAutenticado() && resource.data.uid == request.auth.uid;
+      allow create: if estaAutenticado() && request.resource.data.uid == request.auth.uid;
+      allow update, delete: if estaAutenticado() && resource.data.uid == request.auth.uid;
+    }
+
+    // ── Chats IA ─────────────────────────────────────────────────────────────
+    // Campo de propiedad: "uid"
+    match /chats_ia/{chatId} {
+      allow read: if estaAutenticado() && resource.data.uid == request.auth.uid;
+      allow create: if estaAutenticado() && request.resource.data.uid == request.auth.uid;
+      allow update, delete: if estaAutenticado() && resource.data.uid == request.auth.uid;
+
+      // Mensajes del chat: acceso restringido al dueño del chat padre
+      match /mensajes/{mensajeId} {
+        allow read, write: if estaAutenticado()
+          && get(/databases/$(database)/documents/chats_ia/$(chatId)).data.uid == request.auth.uid;
+      }
+    }
+
+    // ── Recordatorios de medicamentos ────────────────────────────────────────
+    // Campo de propiedad: "uid"
+    match /recordatorios/{recordatorioId} {
+      allow read: if estaAutenticado() && resource.data.uid == request.auth.uid;
+      allow create: if estaAutenticado() && request.resource.data.uid == request.auth.uid;
+      allow update, delete: if estaAutenticado() && resource.data.uid == request.auth.uid;
+
+      // Historial de tomas: mismo dueño que el recordatorio padre
+      match /historial_tomas/{tomaId} {
+        allow read, write: if estaAutenticado()
+          && get(/databases/$(database)/documents/recordatorios/$(recordatorioId)).data.uid == request.auth.uid;
+      }
+    }
+
+    // ── Catálogos de solo lectura (actualizados solo desde consola/scripts) ──
+    match /medicos/{medicoId} {
+      allow read: if estaAutenticado();
+      allow write: if false;
+    }
+
+    match /examenes/{examenId} {
+      allow read: if estaAutenticado();
+      allow write: if false;
+    }
+
+    match /tips_diarios/{tipId} {
+      allow read: if estaAutenticado() && resource.data.uid == request.auth.uid;
+      allow create: if estaAutenticado() && request.resource.data.uid == request.auth.uid;
+      allow update, delete: if estaAutenticado() && resource.data.uid == request.auth.uid;
+    }
+
+    // ── Catch-all: denegar todo lo demás ────────────────────────────────────
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

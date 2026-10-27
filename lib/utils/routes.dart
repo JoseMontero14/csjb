@@ -14,6 +14,8 @@ import '../views/medicos/medico_detalle_view.dart';
 import '../views/medicacion/medicacion_view.dart';
 import '../views/tips/tips_view.dart';
 import '../views/perfil/perfil_view.dart';
+import '../views/perfil/reporte_view.dart';
+import '../views/onboarding/onboarding_view.dart';
 
 abstract final class AppRoutes {
   static const login = '/login';
@@ -31,6 +33,8 @@ abstract final class AppRoutes {
   static const medicacion = '/medicacion';
   static const tips = '/tips';
   static const perfil = '/perfil';
+  static const reporte = '/reporte';
+  static const onboarding = '/onboarding';
 
   static const initial = login;
 
@@ -50,6 +54,8 @@ abstract final class AppRoutes {
         medicacion: (_) => const MedicacionView(),
         tips: (_) => const TipsView(),
         perfil: (_) => const PerfilView(),
+        reporte: (_) => const ReporteView(),
+        onboarding: (_) => const OnboardingView(),
       };
 
   // Navegación con argumento tipado — evita casteos en las vistas
